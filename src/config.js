@@ -17,7 +17,7 @@ export const LEVELS = {
     heartbeat: false,        // E5 심박 되비추기
     timePressure: false,     // E4 시간 압박 큐
     eventsPerSong: 0,        // E4 예측 불가 사건
-    behaviors: { perMin: 1, stern: 0, weights: { whisper: 1, scroll: 1 } },
+    behaviors: { perMin: 2, stern: 0, weights: { whisper: 1, scroll: 1 } },
     backstageSec: 20,
   },
   2: {
@@ -35,7 +35,7 @@ export const LEVELS = {
     heartbeat: false,
     timePressure: false,
     eventsPerSong: 0,
-    behaviors: { perMin: 2, stern: 0, weights: { scroll: 3, whisper: 2, leave: 1, cough: 1 } },
+    behaviors: { perMin: 3, stern: 0, weights: { scroll: 3, whisper: 2, leave: 1, cough: 1 } },
     backstageSec: 30,
   },
   3: {
@@ -53,7 +53,7 @@ export const LEVELS = {
     heartbeat: true,
     timePressure: true,
     eventsPerSong: 1,
-    behaviors: { perMin: 3, stern: 2, weights: { film: 2, whisper: 2, scroll: 1, leave: 1, cough: 1 } },
+    behaviors: { perMin: 4, stern: 2, weights: { film: 2, whisper: 2, scroll: 1, leave: 1, cough: 1 } },
     backstageSec: 40,
   },
   4: {
@@ -71,7 +71,7 @@ export const LEVELS = {
     heartbeat: true,
     timePressure: true,
     eventsPerSong: 1,
-    behaviors: { perMin: 3, stern: 3, weights: { whisper: 2, stern: 2, cough: 1, film: 1 } },
+    behaviors: { perMin: 4, stern: 3, weights: { whisper: 2, stern: 2, cough: 1, film: 1 } },
     backstageSec: 45,
   },
   5: {
@@ -89,7 +89,7 @@ export const LEVELS = {
     heartbeat: true,
     timePressure: true,
     eventsPerSong: 3,
-    behaviors: { perMin: 4, stern: 2, weights: { film: 3, whisper: 1, scroll: 1, leave: 1, cough: 1 } },
+    behaviors: { perMin: 5, stern: 2, weights: { film: 3, whisper: 1, scroll: 1, leave: 1, cough: 1 } },
     backstageSec: 45,
   },
 };
