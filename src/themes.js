@@ -2,7 +2,7 @@
 // (몰입감 Vividness, Presence의 Stable Spatial Place).
 // 움직이지 않는 장식은 merge()로 한 덩어리로 합쳐 그리기 호출 수를 줄인다.
 import * as THREE from 'three';
-import { merge } from './figures.js?v=202611202321';
+import { merge } from './figures.js?v=202611202330';
 
 const R = (a, b) => a + Math.random() * (b - a);
 const M = (x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) =>
@@ -63,7 +63,7 @@ export function decorate(scene, root, level, d) {
 
   if (level.id === 2) {
     // 카페: 나무 바닥, 작은 테이블과 커피잔, 전구 줄 조명, 바 카운터와 에스프레소 머신, 창밖 밤거리
-    const parts = [{ geo: box(W, 0.01, d.audZ0 - d.audZ1), color: 0x6b4a2e, matrix: M(0, y0 + 0.006, zMid) }];
+    const parts = [{ geo: box(W, 0.01, d.audZ0 - d.audZ1), color: 0x6b4a2e, matrix: M(0, y0 + 0.015, zMid) }];
     for (let r = 0; r < 3; r++) for (let i = 0; i < 4; i++) {
       const x = -3 + i * 2 + (r % 2) * 0.8, z = d.audZ0 - 0.55 - r * 1.0;
       parts.push({ geo: cyl(0.3, 0.3, 0.03, 16), color: 0x8a6440, matrix: M(x, y0 + 0.72, z) });
@@ -167,7 +167,7 @@ export function decorate(scene, root, level, d) {
     root.add(sky);
     scene.fog = new THREE.FogExp2(0x0a0818, 0.02);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshLambertMaterial({ color: 0x14140f }));
-    ground.rotation.x = -Math.PI / 2; ground.position.set(0, y0 - 0.01, zMid); root.add(ground);
+    ground.rotation.x = -Math.PI / 2; ground.position.set(0, y0 - 0.05, zMid); root.add(ground);
     const truss = [];
     const tw = d.stageWidth + 3, th = 8;
     for (const x of [-tw / 2, tw / 2]) for (let k = 0; k < 4; k++) truss.push({ geo: cyl(0.04, 0.04, th, 6), color: 0x9a9a9a, matrix: M(x + (k % 2 ? 0.25 : -0.25), y0 + th / 2, d.stageFrontZ + (k < 2 ? 0.2 : 3.2)) });

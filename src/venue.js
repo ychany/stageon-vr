@@ -1,9 +1,9 @@
 // 공연장 구성: 대기실 → (실제로 걷는) 무대 → 객석.
 // 사용자가 헤드셋을 쓴 지점이 대기실이고, 정면으로 STAGE.stageMarkZ 만큼 걸어가면 무대 중앙이다.
 import * as THREE from 'three';
-import { STAGE } from './config.js?v=202611202321';
-import { decorate } from './themes.js?v=202611202321';
-import { Person, Crowd, InstancedPeople, rand, merge } from './figures.js?v=202611202321';
+import { STAGE } from './config.js?v=202611202330';
+import { decorate } from './themes.js?v=202611202330';
+import { Person, Crowd, InstancedPeople, rand, merge } from './figures.js?v=202611202330';
 
 const lam = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 
@@ -101,7 +101,7 @@ export function buildVenue(scene, level) {
   const tape = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.05), new THREE.MeshBasicMaterial({ color: 0xe8e0c0 }));
   tape.rotation.x = -Math.PI / 2; tape.position.set(0, 0.004, STAGE.stageMarkZ);
   root.add(tape);
-  const tape2 = tape.clone(); tape2.rotation.z = Math.PI / 2; root.add(tape2);
+  const tape2 = tape.clone(); tape2.rotation.z = Math.PI / 2; tape2.position.y = 0.0045; root.add(tape2);
   // 마이크 스탠드 (실물 소품과 위치를 맞추는 Haptic Retargeting 지점)
   const stand = new THREE.Group();
   stand.add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.3, 8), lam(0x111111)));
@@ -125,11 +125,12 @@ export function buildVenue(scene, level) {
   floor.rotation.x = -Math.PI / 2; floor.position.set(0, -drop, (audZ0 + audZ1) / 2);
   root.add(floor);
   // 시나리오별 꾸미기 (야외 페스티벌이면 벽과 천장 없음)
-  out.theme = decorate(scene, root, level, { width: V.width, height: V.height, drop, audZ0, audZ1, curtainZ: STAGE.curtainZ, stageFrontZ: STAGE.stageFrontZ, stageWidth: STAGE.stageWidth });
+  out.theme = decorate(scene, root, level, { width: V.width, height: V.height + drop, drop, audZ0, audZ1, curtainZ: STAGE.curtainZ, stageFrontZ: STAGE.stageFrontZ, stageWidth: STAGE.stageWidth });
   const hallMat = lam(V.wall, { side: THREE.BackSide });
-  const hallH = V.height + drop;
+  // 바닥 평면과 공연장 상자의 아랫면이 같은 높이에 겹치면 깜빡이므로(z-fighting) 상자를 3cm 내린다
+  const hallH = V.height + drop + 0.03;
   const hall = new THREE.Mesh(new THREE.BoxGeometry(V.width, hallH, V.depth + stageDepth + 0.2), hallMat);
-  hall.position.set(0, -drop + hallH / 2, (audZ1 + STAGE.curtainZ) / 2);
+  hall.position.set(0, -drop - 0.03 + hallH / 2, (audZ1 + STAGE.curtainZ) / 2);
   if (!out.theme.outdoor) root.add(hall);
   // 출입문 빛 (늦게 들어온 관객이 나오는 곳)
   out.doorPos = new THREE.Vector3(-V.width / 2 + 0.3, -drop, audZ1 + 1.5);

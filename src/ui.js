@@ -1,7 +1,7 @@
 // 헤드셋 안의 안내 패널과 리포트 그래프
 import * as THREE from 'three';
-import { makeCanvasPanel } from './venue.js?v=202611202321';
-import { TUNING } from './config.js?v=202611202321';
+import { makeCanvasPanel } from './venue.js?v=202611202330';
+import { TUNING } from './config.js?v=202611202330';
 
 export class FloatingPanel {
   constructor(scene) {
