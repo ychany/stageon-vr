@@ -145,16 +145,35 @@
 </div>
 
 <div id="report" hidden>
-  <canvas id="reportCanvas" width="1280" height="720"></canvas>
-  <div id="insight"></div>
-  <div id="history"></div>
-  <div class="row buttons">
-    <button id="again" class="primary" type="button">다시 하기</button>
-    <button id="replayBtn" type="button">관객 시점으로 다시 보기</button>
-    <button id="download" type="button">데이터 저장 (JSON)</button>
-    <button id="csvSession" type="button">이번 회차 CSV</button>
-    <button id="csvHistory" type="button">전체 기록 CSV</button>
+  <div class="rep">
+    <header class="rep-head">
+      <div>
+        <p class="rep-kicker">공연 리포트</p>
+        <h1 id="repTitle"></h1>
+        <p id="repMeta" class="rep-meta"></p>
+      </div>
+      <div class="rep-suds"><span>공연 후 불안 (SUDs)</span><b id="repSuds"></b><em id="repSudsPrev"></em></div>
+    </header>
+    <div id="repKpis" class="kpis"></div>
+    <section class="rep-sec">
+      <div class="rep-sec-head"><h2>심박 변화 <small>기준선 대비</small></h2><p class="legend"><i class="lg band"></i>목표 구간 +20–40% <i class="lg line"></i>심박 <i class="lg miss"></i>실수 <i class="lg dot"></i>관객 행동 (채운 점은 내가 봄)</p></div>
+      <div id="repChart"></div>
+    </section>
+    <div id="insight" class="rep-grid"></div>
+    <section class="rep-sec" id="historyBox"><div class="rep-sec-head"><h2 id="historyTitle">회차별 기록</h2></div><div id="history"></div></section>
+    <div class="rep-actions">
+      <div class="row">
+        <button id="again" class="primary" type="button">다시 하기</button>
+        <button id="replayBtn" type="button">관객 시점으로 다시 보기</button>
+      </div>
+      <div class="row exports"><span>내보내기</span>
+        <button id="download" class="link" type="button">JSON</button>
+        <button id="csvSession" class="link" type="button">이번 회차 CSV</button>
+        <button id="csvHistory" class="link" type="button">전체 기록 CSV</button>
+      </div>
+    </div>
   </div>
+  <canvas id="reportCanvas" width="1280" height="720"></canvas>
 </div>
 
 <div id="measure" hidden>
@@ -188,6 +207,6 @@
   window.addEventListener('unhandledrejection', function (e) { stageonError(String(e.reason && e.reason.message || e.reason)); });
   setTimeout(function () { if (!document.querySelector('input[name=scenario]')) stageonError('시나리오 목록을 불러오지 못했습니다'); }, 4000);
 </script>
-<script type="module" src="src/main.js?v=202611210127"></script>
+<script type="module" src="src/main.js?v=202611210200"></script>
 </body>
 </html>

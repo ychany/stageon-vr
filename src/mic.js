@@ -16,7 +16,7 @@ export class InstrumentInput {
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
     });
     this.src = ctx.createMediaStreamSource(stream);
-    await ctx.audioWorklet.addModule(new URL('./onset-worklet.js?v=202611210127', import.meta.url));
+    await ctx.audioWorklet.addModule(new URL('./onset-worklet.js?v=202611210200', import.meta.url));
     this.node = new AudioWorkletNode(ctx, 'onset-processor');
     this.node.port.onmessage = (e) => {
       if (e.data.type === 'onset') {

@@ -1,16 +1,16 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611210127';
-import { buildVenue } from './venue.js?v=202611210127';
-import { AudioEngine } from './audio.js?v=202611210127';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611210127';
-import { InstrumentInput } from './mic.js?v=202611210127';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611210127';
-import { estimateTempo } from './tempo.js?v=202611210127';
+import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611210200';
+import { buildVenue } from './venue.js?v=202611210200';
+import { AudioEngine } from './audio.js?v=202611210200';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611210200';
+import { InstrumentInput } from './mic.js?v=202611210200';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611210200';
+import { estimateTempo } from './tempo.js?v=202611210200';
 import qrcode from '../vendor/qrcode.mjs';
-import { FloatingPanel, drawReport } from './ui.js?v=202611210127';
-import { Person, rand } from './figures.js?v=202611210127';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611210127';
+import { FloatingPanel, drawReport } from './ui.js?v=202611210200';
+import { Person, rand } from './figures.js?v=202611210200';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611210200';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -1131,6 +1131,7 @@ let ghost = null;
 function startReplay() {
   if (S.rec.length < 5) return;
   $('#report').hidden = true;
+  $('#hud').hidden = false;
   $('#replayBar').hidden = false;
   panel.hide();
   if (!ghost) {
@@ -1157,6 +1158,7 @@ function stopReplay() {
   if (ghost) ghost.root.visible = false;
   if (S.inst) S.inst.root.visible = true;
   $('#replayBar').hidden = true;
+  $('#hud').hidden = true;
   $('#report').hidden = false;
 }
 const qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
@@ -1342,15 +1344,14 @@ function showReport() {
     recovery: data.recoveries.length ? data.recoveries.reduce((a, b) => a + b, 0) / data.recoveries.length : null,
     simulated: S.hr.simulated, cues: S.cues, condition: data.condition, participant: data.participant,
   });
-  const rows = [...prev.slice(-4), { date: new Date().toISOString(), meanRatio: data.meanRatio, mistakes: data.mistakes.length, suds: data.sudsPost, now: true }];
-  const pct = (r) => (Number.isFinite(r) ? `${r >= 0 ? '+' : ''}${Math.round(r * 100)}%` : '–');
-  $('#history').innerHTML = `<b>${data.scenario} 회차별 기록</b><table><tr><th>회차</th><th>날짜</th><th>연주 중 평균 심박</th><th>실수</th><th>SUDs</th></tr>${
-    rows.map((r, i) => `<tr${r.now ? ' class="now"' : ''}><td>${data.session - rows.length + 1 + i}</td><td>${new Date(r.date).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td><td>${pct(r.meanRatio)}</td><td>${r.mistakes}</td><td>${r.suds ?? '–'}</td></tr>`).join('')}</table>`;
-  drawInsight(data);
+  data.prevSuds = prevSuds;
+  drawReportPage(data, prev);
   const c = $('#reportCanvas');
   drawReport(c, data);
   panel.showCanvas(c);
   $('#report').hidden = false;
+  $('#report').scrollTop = 0;
+  $('#hud').hidden = true;
   $('#replayBtn').hidden = S.vr || S.rec.length < 5;
   if (document.pointerLockElement) document.exitPointerLock();
   $('#download').onclick = () => {
@@ -1371,21 +1372,106 @@ function download(text, name) {
   a.click();
 }
 
-// 리포트 아래: 관객 행동 분석 + 다음 회차 추천
-function drawInsight(data) {
+// ---------- 리포트 화면 (PC) ----------
+const pctS = (r, digits = 0) => (Number.isFinite(r) ? `${r >= 0 ? '+' : ''}${(r * 100).toFixed(digits)}%` : '–');
+const ACT = { up: '한 단계 올리기', down: '한 단계 내리기', stay: '같은 단계 반복', real: '실제 무대 도전' };
+function drawReportPage(data, prev) {
+  const COND = { vr: 'StageOn VR', practice: '조건 A · 혼자 연습실', real: '조건 C · 실제 관객 앞', baseline: '기준선 측정' };
+  $('#repTitle').textContent = data.scenario;
+  $('#repMeta').textContent = [`${data.session}회차`, `Lv${data.level} ${data.levelName}`, COND[data.condition] || '', data.participant ? `참가자 ${data.participant}` : '',
+    data.encore ? '앵콜 받음' : '', data.hrSource, data.mic ? '악기 입력' : '실수는 수동 입력', new Date().toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })].filter(Boolean).join(' · ');
+  $('#repSuds').textContent = data.sudsPost === null || data.sudsPost === undefined ? '–' : `${data.sudsPost} / 10`;
+  $('#repSudsPrev').textContent = data.prevSuds !== null && data.prevSuds !== undefined ? `지난 회차 ${data.prevSuds}점` : '첫 기록';
+
+  // 핵심 수치: 지난 회차와 비교 (불안 지표는 오르면 주황, 내리면 청록)
+  const last = prev[prev.length - 1] || null;
+  const diff = (now, before, unit = '%p', scale = 100) => {
+    if (!last || !Number.isFinite(now) || !Number.isFinite(before)) return '<em>지난 회차 없음</em>';
+    const d = Math.round((now - before) * scale);
+    return `<em class="${d > 0 ? 'up' : d < 0 ? 'down' : ''}">지난번 ${d > 0 ? '+' : ''}${d}${unit}</em>`;
+  };
+  const avgRec = data.recoveries.length ? data.recoveries.reduce((a, b) => a + b, 0) / data.recoveries.length : NaN;
+  const kpis = [
+    ['연주 중 평균 심박', pctS(data.meanRatio), diff(data.meanRatio, last && last.meanRatio)],
+    ['최고 심박', pctS(data.peakRatio), diff(data.peakRatio, last && last.peakRatio)],
+    ['실수', `${data.mistakes.length}회`, last ? diff(data.mistakes.length, last.mistakes, '회', 1) : '<em>지난 회차 없음</em>'],
+    ['평균 회복 시간', Number.isFinite(avgRec) ? `${avgRec.toFixed(1)}초` : '–', `<em>${data.recoveries.length}번 회복</em>`],
+    ['시선 회피', `${Math.round(data.gazeAvoidRatio * 100)}%`, '<em>연주 시간 중 바닥을 본 비율</em>'],
+    ['눈맞춤', `${data.eyeContacts}회`, '<em>1초 이상 관객과 마주침</em>'],
+  ];
+  $('#repKpis').innerHTML = kpis.map(([k, v, d]) => `<div class="kpi"><span>${k}</span><b>${v}</b>${d}</div>`).join('');
+
+  $('#repChart').innerHTML = chartSVG(data);
+
+  // 관객 행동 분석 + 다음 회차 추천
   const sum = behaviorSummary(data);
-  const rows = Object.entries(sum).sort((a, b) => b[1].n - a[1].n).map(([k, o]) => {
-    const rise = o.rise.length ? Math.round(o.rise.reduce((a, b) => a + b, 0) / o.rise.length * 100) : null;
-    return `<li>${BEHAVIORS[k] ? BEHAVIORS[k].label : k} — ${o.n}회 (내가 본 것 ${o.seen}회)${rise !== null ? ` · 직후 10초 심박 ${rise >= 0 ? '+' : ''}${rise}%p` : ''}</li>`;
-  });
+  const brows = Object.entries(sum).map(([k, o]) => ({ k, ...o, riseAvg: o.rise.length ? o.rise.reduce((a, b) => a + b, 0) / o.rise.length : NaN }))
+    .sort((a, b) => (Number.isFinite(b.riseAvg) ? b.riseAvg : -9) - (Number.isFinite(a.riseAvg) ? a.riseAvg : -9));
   const n = data.next;
-  const ACT = { up: '한 단계 올리기', down: '한 단계 내리기', stay: '같은 단계 반복', real: '실제 무대 도전' };
   const sc = n ? SCENARIOS.findIndex((x) => x.level === n.level) : -1;
   $('#insight').innerHTML = `
-    <div class="box"><b>관객 행동 분석</b>${rows.length ? `<ul>${rows.join('')}</ul><span class="hint" style="margin:0">심박이 가장 크게 오른 행동이 지금 나에게 가장 큰 불안 요소입니다.</span>` : '<p class="hint" style="margin:6px 0">이번 공연에서는 기록된 관객 행동이 없습니다.</p>'}</div>
-    <div class="box"><b>다음 회차 추천</b>${n ? `<p style="margin:6px 0;font-size:16px"><b style="color:var(--ink)">${ACT[n.action]}</b> → Lv${n.level} ${LEVELS[n.level].name}${n.helper ? ' · 회복 도우미 켜기' : ''}</p><ul>${n.reasons.map((r) => `<li>${r}</li>`).join('')}</ul>${n.action !== 'real' && sc >= 0 ? `<button type="button" id="goNext" class="primary">추천 단계로 바로 시작</button>` : ''}` : '<p class="hint" style="margin:6px 0">측정 전용 모드에서는 추천하지 않습니다.</p>'}</div>`;
+    <div><h2>관객 행동 분석 <small>심박이 크게 오른 순</small></h2>${brows.length ? `<table><tr><th>행동</th><th class="tnum">횟수</th><th class="tnum">내가 봄</th><th class="tnum">직후 10초 심박</th></tr>${
+      brows.map((b, i) => `<tr><td>${i === 0 && Number.isFinite(b.riseAvg) ? '<b>' : ''}${BEHAVIORS[b.k] ? BEHAVIORS[b.k].label : b.k}${i === 0 && Number.isFinite(b.riseAvg) ? '</b>' : ''}</td><td class="tnum">${b.n}</td><td class="tnum">${b.seen}</td><td class="tnum">${Number.isFinite(b.riseAvg) ? `${b.riseAvg >= 0 ? '+' : ''}${Math.round(b.riseAvg * 100)}%p` : '–'}</td></tr>`).join('')}</table>`
+      : `<p class="empty">이번 공연에서는 관객 행동이 일어나지 않았습니다. 관객 행동은 연주 중 단계별 빈도로 일어나므로, 연주를 끝까지 하면 기록됩니다.</p>`}</div>
+    <div><h2>다음 회차 추천</h2>${n ? `<p class="rec-act">${ACT[n.action]} <span>→ Lv${n.level} ${LEVELS[n.level].name}</span></p>
+      <ul class="rec-why">${n.reasons.map((r) => `<li>${r}</li>`).join('')}${n.helper ? '<li>회복 도우미를 켜고 시작합니다.</li>' : ''}</ul>
+      ${n.action !== 'real' && sc >= 0 ? `<button type="button" id="goNext" class="primary">추천 단계로 시작</button>` : ''}` : '<p class="empty">측정 전용 모드에서는 추천하지 않습니다.</p>'}</div>`;
   const go = $('#goNext');
   if (go) go.onclick = () => { try { localStorage.setItem('stageon.autostart', '1'); } catch { /* 무시 */ } restart(); };
+
+  // 회차별 기록: 평균 심박을 막대로
+  const rows = [...prev.slice(-5), { date: new Date().toISOString(), meanRatio: data.meanRatio, mistakes: data.mistakes.length, suds: data.sudsPost, now: true }];
+  const maxR = Math.max(0.4, ...rows.map((r) => (Number.isFinite(r.meanRatio) ? r.meanRatio : 0)));
+  $('#historyTitle').innerHTML = `회차별 기록 <small>${data.scenario} · 같은 조건</small>`;
+  $('#history').innerHTML = `<table><tr><th>회차</th><th>날짜</th><th>연주 중 평균 심박</th><th class="tnum">실수</th><th class="tnum">SUDs</th></tr>${
+    rows.map((r, i) => `<tr${r.now ? ' class="now"' : ''}><td>${data.session - rows.length + 1 + i}${r.now ? ' (이번)' : ''}</td><td>${new Date(r.date).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td><td><span class="bar" style="width:${Math.max(2, Math.round(Math.max(0, r.meanRatio || 0) / maxR * 160))}px"></span>${pctS(r.meanRatio)}</td><td class="tnum">${r.mistakes}</td><td class="tnum">${r.suds ?? '–'}</td></tr>`).join('')}</table>`;
+}
+
+// 심박 곡선 SVG: 기준선 대비 %, 목표 구간, 단계 구분, 실수, 관객 행동
+function chartSVG(data) {
+  const W = 1000, H = 300, L = 48, R = 12, T = 30, B = 34;
+  const pts = data.hr.filter((p) => ['call', 'hush', 'perform', 'encore', 'finish'].includes(p.phase) && Number.isFinite(p.ratio));
+  if (pts.length < 2) return '<p class="empty" style="padding:24px">기록된 심박이 없습니다.</p>';
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  const vals = pts.map((p) => p.ratio);
+  const lo = Math.min(-0.1, Math.floor((Math.min(...vals) - 0.02) * 10) / 10);
+  const hi = Math.max(0.5, Math.ceil((Math.max(...vals) + 0.02) * 10) / 10);
+  const x = (t) => L + ((t - t0) / Math.max(1, t1 - t0)) * (W - L - R);
+  const y = (r) => T + (1 - (r - lo) / (hi - lo)) * (H - T - B);
+  let g = '';
+  // 단계 구분 (입장 · 정적 · 연주 · 앵콜 · 종료)
+  const NAMES = { call: '입장', hush: '정적', perform: '연주', encore: '앵콜', finish: '종료' };
+  let segStart = pts[0], k = 0;
+  for (let i = 1; i <= pts.length; i++) {
+    const p = pts[i];
+    if (!p || p.phase !== segStart.phase) {
+      const xa = x(segStart.t), xb = x((p || pts[pts.length - 1]).t);
+      if (k++ % 2) g += `<rect x="${xa}" y="${T}" width="${Math.max(0, xb - xa)}" height="${H - T - B}" fill="#F3F4F6"/>`;
+      if (xb - xa > 34) g += `<text x="${(xa + xb) / 2}" y="${H - 12}" text-anchor="middle" font-size="12" fill="#6B7280">${NAMES[segStart.phase] || ''}</text>`;
+      segStart = p;
+    }
+  }
+  // 목표 구간과 눈금
+  g += `<rect x="${L}" y="${y(TUNING.targetHigh)}" width="${W - L - R}" height="${y(TUNING.targetLow) - y(TUNING.targetHigh)}" fill="rgba(15,118,110,0.12)"/>`;
+  for (let r = Math.ceil(lo * 10) / 10; r <= hi + 1e-9; r += 0.1) {
+    const rr = Math.round(r * 10) / 10;
+    if (Math.round(rr * 100) % 20 !== 0) continue;
+    g += `<line x1="${L}" x2="${W - R}" y1="${y(rr)}" y2="${y(rr)}" stroke="${rr === 0 ? '#9CA3AF' : '#E5E7EB'}" stroke-width="1"/>`;
+    g += `<text x="${L - 8}" y="${y(rr) + 4}" text-anchor="end" font-size="12" fill="#6B7280">${rr > 0 ? '+' : ''}${Math.round(rr * 100)}%</text>`;
+  }
+  // 실수
+  for (const m of data.mistakes) if (m >= t0 && m <= t1) g += `<line x1="${x(m)}" x2="${x(m)}" y1="${T}" y2="${H - B}" stroke="#D97706" stroke-width="2"/>`;
+  // 심박 곡선
+  g += `<polyline fill="none" stroke="#1F2937" stroke-width="2.5" stroke-linejoin="round" points="${pts.map((p) => `${x(p.t).toFixed(1)},${y(p.ratio).toFixed(1)}`).join(' ')}"/>`;
+  // 관객 행동 (위쪽 줄)
+  const SHORT = { film: '촬영', stern: '팔짱', whisper: '수군', scroll: '딴짓', leave: '퇴장', cough: '기침' };
+  (data.behaviors || []).forEach((b, i) => {
+    if (b.t < t0 || b.t > t1) return;
+    const cy = 9 + (i % 2) * 14;
+    g += `<circle cx="${x(b.t)}" cy="${cy}" r="5" fill="${b.seen ? '#0F766E' : '#FFFFFF'}" stroke="#0F766E" stroke-width="1.5"/>`;
+    g += `<text x="${x(b.t) + 8}" y="${cy + 4}" font-size="11" fill="#0F766E">${SHORT[b.type] || ''}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="연주 중 심박 변화 그래프">${g}</svg>`;
 }
 
 // 이번 회차 시계열 CSV: 0.5초마다 심박 + 그 구간의 실수·사건·관객 행동
