@@ -48,3 +48,5 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 #subtitle[hidden] { display: none; }
 .error { color: #b3261e; font-weight: 700; font-size: 14px; }
 .error[hidden] { display: none; }
+#skipBtn { position: fixed; right: 16px; top: 16px; z-index: 5; background: rgba(255,255,255,0.9); }
+#skipBtn[hidden] { display: none; }

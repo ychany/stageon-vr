@@ -1,13 +1,14 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js?v=202611202240';
-import { buildVenue } from './venue.js?v=202611202240';
-import { AudioEngine } from './audio.js?v=202611202240';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611202240';
-import { InstrumentInput } from './mic.js?v=202611202240';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js?v=202611202240';
-import { FloatingPanel, drawReport } from './ui.js?v=202611202240';
-import { Person, rand } from './figures.js?v=202611202240';
+import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js?v=202611202246';
+import { buildVenue } from './venue.js?v=202611202246';
+import { AudioEngine } from './audio.js?v=202611202246';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611202246';
+import { InstrumentInput } from './mic.js?v=202611202246';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js?v=202611202246';
+import { FloatingPanel, drawReport } from './ui.js?v=202611202246';
+import { Person, rand } from './figures.js?v=202611202246';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611202246';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -144,6 +145,20 @@ async function begin(vr) {
 
   S.venue = buildVenue(scene, level);
   if (photoTexture) applyPhoto(photoTexture);
+  // 악기: 무대 뒤 앰프에서 내 소리가 나온다
+  const instType = $('input[name=instrument]:checked').value;
+  S.ampPos = new THREE.Vector3(0.9, 0.45, STAGE.curtainZ - 0.35);
+  const amp = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.55, 0.32), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
+  amp.position.set(S.ampPos.x, 0.275, S.ampPos.z); amp.rotation.y = Math.PI - 0.3;
+  const grill = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.36), new THREE.MeshLambertMaterial({ color: 0x3a3226 }));
+  grill.position.set(0, 0.03, -0.161); grill.rotation.y = Math.PI; amp.add(grill);
+  S.venue.root.add(amp);
+  S.sound = new InstrumentSound(audio, instType, S.ampPos);
+  S.strums = 0;
+  if ($('#showInstrument').checked) {
+    S.inst = new Instrument(instType);
+    if (!vr) S.inst.attachDesktop(camera);
+  }
   S.director = new StressorDirector(level, TUNING);
   S.tracker = new RecoveryTracker(TUNING, (60 / TUNING.bpm) * 4);
   S.judge = new TimingJudge({ thresholdSec: TUNING.timingErrorSec });
@@ -181,8 +196,8 @@ function setPhase(ph) {
     panel.show(S.sc.title, [
       ...S.sc.story,
       S.sc.goal,
-      '정면 커튼 너머가 무대입니다. 악기를 준비하세요.',
-    ], { footer: `Lv${L.id} ${L.name} · ` + (S.vr ? '비상 정지: 왼손 X 버튼' : '비상 정지 Q · 실수 M · 심박 ↑/↓') });
+      S.vr && S.inst ? '왼손 컨트롤러를 헤드에 달고 연주 자세로 든 뒤 오른손 트리거로 위치 맞춤' : '정면 커튼 너머가 무대입니다. 악기를 준비하세요.',
+    ], { footer: `Lv${L.id} ${L.name} · ` + (S.vr ? '연주 트리거 · 건너뛰기 B · 비상 정지 X' : '연주 Space · 건너뛰기 N · 실수 M · 비상 정지 Q') });
     S.bsIdx = 0;
     if (L.timePressure && !S.sc.backstage.some((b) => b.who === 'staff')) setTimeout(() => S.phase === 'backstage' && speak('staff', '5분 전입니다. 준비해 주세요.'), 3000);
   }
@@ -469,6 +484,41 @@ function emergencyStop(reason = '사용자 요청') {
   updateHud();
 }
 
+// ---------- 악기 연주 ----------
+function currentRoot(t) {
+  const roots = [40, 40, 45, 43];   // 반주와 같은 코드 진행 (E, E, A, G)
+  if (!audio.gridStart || t < audio.gridStart) return roots[0];
+  const bar = Math.floor((t - audio.gridStart) / (audio.beatSec * 4));
+  return roots[Math.floor(bar / 2) % 4];
+}
+function strum() {
+  if (!S.sound || ['menu', 'stopped', 'report'].includes(S.phase)) return;
+  const t = audio.ctx.currentTime;
+  S.sound.strum(currentRoot(t), t);
+  if (S.inst) S.inst.strum();
+  haptic(0.3, 30);
+  if (S.phase === 'perform') { S.strums++; onOnset(t); }
+}
+function calibrateInstrument() {
+  const cam = renderer.xr.getCamera();
+  const pos = new THREE.Vector3(), dir = new THREE.Vector3();
+  cam.getWorldPosition(pos); cam.getWorldDirection(dir);
+  if (S.inst.calibrate(pos, dir)) {
+    S.inst.showGuide(false);
+    log('악기 위치 교정 완료');
+    haptic(0.8, 120);
+    audio.penScratch(pos.clone().add(new THREE.Vector3(0, -0.5, 0)), 0.2);
+  }
+}
+// 연주(또는 대기·입장) 건너뛰기
+function skip() {
+  if (S.phase === 'backstage') setPhase('call');
+  else if (S.phase === 'call' && !S.vr) { camera.position.set(0, 1.6, STAGE.stageMarkZ); }
+  else if (S.phase === 'perform') { audio.stopBand(); log('연주 건너뛰기'); setPhase('finish'); }
+  else if (S.phase === 'encore') { S.encoreDone = true; setPhase('report'); }
+}
+$('#skipBtn').addEventListener('click', skip);
+
 // ---------- 입력: PC ----------
 const keys = new Set();
 let yaw = 0, pitch = 0;
@@ -482,6 +532,8 @@ document.addEventListener('keydown', (e) => {
   keys.add(e.code);
   if (S.phase === 'menu') return;
   if (e.code === 'KeyM') onMistake('수동 입력');
+  if (e.code === 'Space') { e.preventDefault(); strum(); }
+  if (e.code === 'KeyN') skip();
   if (e.code === 'KeyQ') emergencyStop();
   if (e.code === 'KeyG') { S.debug = !S.debug; $('#debug').hidden = !S.debug; }
   if (e.code === 'ArrowUp' && S.hr.nudge) S.hr.nudge(0.05);
@@ -518,7 +570,11 @@ function setupControllers() {
     const c = renderer.xr.getController(i);
     const g = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.12), new THREE.MeshLambertMaterial({ color: 0x333344 }));
     c.add(g);
-    c.addEventListener('connected', (e) => { c.userData.source = e.data; });
+    c.addEventListener('connected', (e) => {
+      c.userData.source = e.data;
+      // 왼손 컨트롤러 = 악기 헤드 마운트 (보고서 2-5)
+      if (e.data.handedness === 'left' && S.inst && !S.inst.controller) { S.inst.attachVR(c); S.inst.showGuide(true); }
+    });
     c.addEventListener('disconnected', () => { c.userData.source = null; });
     scene.add(c);
     controllers.push(c);
@@ -534,7 +590,12 @@ function pollXRInput() {
     const prev = prevButtons.get(src) || [];
     const pressed = (i) => gp.buttons[i] && gp.buttons[i].pressed && !prev[i];
     if (src.handedness === 'left' && pressed(4)) emergencyStop();             // X 버튼
-    if (src.handedness === 'right' && pressed(0) && $('#demoTrigger').checked) onMistake('컨트롤러 시연 입력');
+    if (src.handedness === 'right' && pressed(0)) {                              // 트리거: 교정 또는 스트럼
+      if (S.inst && S.inst.ghost && S.inst.ghost.visible) calibrateInstrument();
+      else strum();
+    }
+    if (src.handedness === 'right' && pressed(1) && $('#demoTrigger').checked) onMistake('컨트롤러 시연 입력');  // 그립
+    if (src.handedness === 'right' && pressed(5)) skip();                         // B 버튼: 건너뛰기
     if (src.handedness === 'right' && pressed(4) && S.phase === 'report') restart();  // A 버튼
     if (src.handedness === 'right' && S.hr.nudge && gp.axes[3] !== undefined && Math.abs(gp.axes[3]) > 0.7) S.hr.nudge(-gp.axes[3] * 0.002);
     prevButtons.set(src, gp.buttons.map((b) => b.pressed));
@@ -630,7 +691,7 @@ function step(dt, cam) {
     // 예측 불가 사건
     while (S.eventTimes.length && now >= S.eventTimes[0]) { S.eventTimes.shift(); randomEvent(); }
     // 정적 3초 → 술렁임 (악기 입력이 있을 때만)
-    if (S.mic && audio.gridStart && audio.ctx.currentTime > audio.gridStart + 2 && audio.ctx.currentTime - S.lastOnsetTime > TUNING.silenceSec && !S.silenceFired) {
+    if ((S.mic || S.strums > 0) && audio.gridStart && audio.ctx.currentTime > audio.gridStart + 2 && audio.ctx.currentTime - S.lastOnsetTime > TUNING.silenceSec && !S.silenceFired) {
       S.silenceFired = true;
       onMistake('정적 3초');
     }
@@ -661,6 +722,8 @@ function step(dt, cam) {
     p.update(dt, now, ctx);
   }
   if (S.venue.crowd) S.venue.crowd.update(dt, now);
+  if (S.inst) S.inst.update(dt);
+  $('#skipBtn').hidden = !['backstage', 'perform', 'encore'].includes(S.phase);
 
   // 눈부심: 조명을 바라볼수록 강해짐
   if (S.venue.spot.intensity > 0) {
@@ -767,7 +830,7 @@ function updateHud(ratio) {
   const p = S.director ? S.director.params() : {};
   const r = Number.isFinite(ratio) ? `${ratio >= 0 ? '+' : ''}${Math.round(ratio * 100)}%` : '–';
   $('#hudText').textContent = `Lv${S.level.id} ${S.level.name} · ${PHASE[S.phase]} · 심박 ${Math.round(S.hr ? S.hr.bpm : 0)} (${r})${S.hr && S.hr.simulated ? ' 시뮬레이션' : ''}`;
-  $('#hudSub').textContent = S.phase === 'call' ? '노란 표시까지 걸어 나가세요 (W)' : S.phase === 'backstage' ? '대기 중 · Enter로 건너뛰기' : '';
+  $('#hudSub').textContent = S.phase === 'call' ? '노란 표시까지 걸어 나가세요 (W, 또는 N으로 바로 이동)' : S.phase === 'backstage' ? '대기 중 · Space로 악기 풀기 · N 건너뛰기' : S.phase === 'perform' ? `Space로 박자에 맞춰 연주 · N 건너뛰기 · 연주 ${S.strums}번` : '';
   if (S.debug && S.director) {
     $('#debugText').textContent = [
       `기준선 ${Math.round(S.baseline || 0)} bpm (${S.baselineSource || '측정 중'})`,
