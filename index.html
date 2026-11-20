@@ -23,6 +23,7 @@
     <fieldset>
       <legend>시나리오</legend>
       <div id="scenarios"></div>
+      <p id="loadError" class="error" hidden></p>
     </fieldset>
 
     <fieldset>
@@ -66,6 +67,16 @@
   <button type="button" onclick="location.reload()">처음으로</button>
 </div>
 
-<script type="module" src="src/main.js"></script>
+<script>
+  // 모듈을 불러오지 못하면(오래된 캐시, 네트워크 오류) 시작 화면에 알려 준다
+  function stageonError(msg) {
+    var el = document.getElementById('loadError');
+    if (el) { el.hidden = false; el.textContent = '불러오기 오류: ' + msg + ' — 새로고침(Ctrl+Shift+R, Mac은 Cmd+Shift+R) 해 주세요.'; }
+  }
+  window.addEventListener('error', function (e) { stageonError(e.message || '스크립트 오류'); });
+  window.addEventListener('unhandledrejection', function (e) { stageonError(String(e.reason && e.reason.message || e.reason)); });
+  setTimeout(function () { if (!document.querySelector('input[name=scenario]')) stageonError('시나리오 목록을 불러오지 못했습니다'); }, 4000);
+</script>
+<script type="module" src="src/main.js?v=202611202240"></script>
 </body>
 </html>

@@ -46,3 +46,5 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 #subtitle { position: fixed; left: 50%; bottom: 56px; transform: translateX(-50%); background: rgba(10,10,20,0.75); color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 18px; z-index: 4; max-width: 90vw; text-align: center; }
 #subtitle b { color: var(--gold); margin-right: 8px; }
 #subtitle[hidden] { display: none; }
+.error { color: #b3261e; font-weight: 700; font-size: 14px; }
+.error[hidden] { display: none; }

@@ -1,8 +1,8 @@
 // 공연장 구성: 대기실 → (실제로 걷는) 무대 → 객석.
 // 사용자가 헤드셋을 쓴 지점이 대기실이고, 정면으로 STAGE.stageMarkZ 만큼 걸어가면 무대 중앙이다.
 import * as THREE from 'three';
-import { STAGE } from './config.js';
-import { Person, Crowd, rand, merge } from './figures.js';
+import { STAGE } from './config.js?v=202611202240';
+import { Person, Crowd, rand, merge } from './figures.js?v=202611202240';
 
 const lam = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 

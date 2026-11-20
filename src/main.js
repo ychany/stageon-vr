@@ -1,13 +1,13 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js';
-import { buildVenue } from './venue.js';
-import { AudioEngine } from './audio.js';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js';
-import { InstrumentInput } from './mic.js';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js';
-import { FloatingPanel, drawReport } from './ui.js';
-import { Person, rand } from './figures.js';
+import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js?v=202611202240';
+import { buildVenue } from './venue.js?v=202611202240';
+import { AudioEngine } from './audio.js?v=202611202240';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611202240';
+import { InstrumentInput } from './mic.js?v=202611202240';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js?v=202611202240';
+import { FloatingPanel, drawReport } from './ui.js?v=202611202240';
+import { Person, rand } from './figures.js?v=202611202240';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
