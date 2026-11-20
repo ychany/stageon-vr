@@ -1,7 +1,7 @@
 // 가상 악기: 실물 악기 위에 겹쳐 보이는 기타/베이스와 연주 소리.
 // 보고서 2-5: 악기 헤드에 컨트롤러를 달고(마운트), 가상 악기를 실물 위치에 1:1로 맞춘다.
 import * as THREE from 'three';
-import { merge } from './figures.js?v=202611202306';
+import { merge } from './figures.js?v=202611202321';
 
 const TYPES = {
   guitar: { name: '일렉 기타', strings: 6, scale: 0.65, body: 0xb3261e, neck: 0x6b4423, open: [40, 45, 50, 55, 59, 64] },
@@ -104,6 +104,29 @@ export class Instrument {
     new THREE.Matrix4().makeBasis(x, y, z).decompose(new THREE.Vector3(), this.root.quaternion, new THREE.Vector3());
     this.root.position.copy(head);
     camera.add(this.root);
+  }
+
+  // VR 손 추적(컨트롤러 없음): 머리의 수평 방향을 따라 허리 앞에 둔다
+  attachBody(scene) {
+    this.bodyMode = true;
+    this._local = new THREE.Matrix4();
+    const head = new THREE.Vector3(-0.42, -0.55, -0.3);   // 머리 기준 (오른쪽 +x, 앞 -z)
+    const x = new THREE.Vector3(0.88, -0.25, 0.3).normalize();
+    const z = new THREE.Vector3(0, 0.5, 0.86);
+    z.sub(x.clone().multiplyScalar(z.dot(x))).normalize();
+    const y = new THREE.Vector3().crossVectors(z, x);
+    this._local.makeBasis(x, y, z).setPosition(head);
+    scene.add(this.root);
+  }
+  followBody(headPos, headDir) {
+    if (!this.bodyMode) return;
+    const yaw = Math.atan2(-headDir.x, -headDir.z);
+    const m = new THREE.Matrix4().makeRotationY(yaw).setPosition(headPos).multiply(this._local);
+    m.decompose(this.root.position, this.root.quaternion, this.root.scale);
+  }
+  // 몸통 중심(줄을 치는 곳)의 월드 위치
+  strumPoint(out) {
+    return this.root.localToWorld(out.set(this.bodyCenterX - 0.08, 0, 0.02));
   }
 
   // VR: 헤드에 단 컨트롤러를 따라간다. 교정 전에는 기본 자세.

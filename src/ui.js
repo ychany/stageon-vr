@@ -1,7 +1,7 @@
 // 헤드셋 안의 안내 패널과 리포트 그래프
 import * as THREE from 'three';
-import { makeCanvasPanel } from './venue.js?v=202611202306';
-import { TUNING } from './config.js?v=202611202306';
+import { makeCanvasPanel } from './venue.js?v=202611202321';
+import { TUNING } from './config.js?v=202611202321';
 
 export class FloatingPanel {
   constructor(scene) {
@@ -77,7 +77,8 @@ export function drawReport(canvas, data) {
   ctx.fillText(`공연 리포트 · ${data.scenario || ''}`, 40, 60);
   ctx.font = '400 22px "Noto Sans KR", sans-serif';
   ctx.fillStyle = '#6E6A8C';
-  ctx.fillText(`Lv${data.level} ${data.levelName}${data.encore ? ' · 앵콜 받음' : ''} · ${data.hrSource}${data.mic ? ' · 악기 입력 사용' : ' · 실수는 수동 입력'}`, 40, 92);
+  const COND = { vr: 'StageOn VR', practice: '조건 A 혼자 연습실', real: '조건 C 실제 관객 앞' };
+  ctx.fillText(`${COND[data.condition] || ''}${data.participant ? ' · 참가자 ' + data.participant : ''} · Lv${data.level} ${data.levelName}${data.encore ? ' · 앵콜 받음' : ''} · ${data.hrSource}${data.mic ? ' · 악기 입력 사용' : ' · 실수는 수동 입력'}`, 40, 92);
 
   // 그래프 영역
   const gx = 60, gy = 120, gw = W * 0.62, gh = H - 190;

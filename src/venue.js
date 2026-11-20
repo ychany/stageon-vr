@@ -1,9 +1,9 @@
 // 공연장 구성: 대기실 → (실제로 걷는) 무대 → 객석.
 // 사용자가 헤드셋을 쓴 지점이 대기실이고, 정면으로 STAGE.stageMarkZ 만큼 걸어가면 무대 중앙이다.
 import * as THREE from 'three';
-import { STAGE } from './config.js?v=202611202306';
-import { decorate } from './themes.js?v=202611202306';
-import { Person, Crowd, rand, merge } from './figures.js?v=202611202306';
+import { STAGE } from './config.js?v=202611202321';
+import { decorate } from './themes.js?v=202611202321';
+import { Person, Crowd, InstancedPeople, rand, merge } from './figures.js?v=202611202321';
 
 const lam = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 
@@ -53,10 +53,8 @@ export function buildVenue(scene, level) {
   root.add(spill);
   out.spill = spill;
 
-  const wash = new THREE.PointLight(0x8090ff, 0, 10, 2);
-  wash.position.set(0, 3.5, STAGE.stageMarkZ + 0.8);
-  root.add(wash);
-  out.wash = wash;
+  // (성능) 무대 보조 조명은 실제 광원 대신 값만 둔다: VR은 양쪽 눈을 그리므로 광원 수를 줄인다
+  out.wash = { intensity: 0 };
 
   // ---------- 대기실 ----------
   const bsW = 3.2, bsZ0 = STAGE.curtainZ, bsZ1 = STAGE.backstageBackZ, bsH = 2.8;
@@ -193,6 +191,8 @@ export function buildVenue(scene, level) {
   };
   for (let r = 0; r < level.frontRows; r++) placeRow(level.frontPerRow, 'A');
   for (let r = 0; r < level.midRows; r++) placeRow(level.midPerRow, 'B');
+  const mids = out.people.filter((p) => p.tier === 'B');
+  if (mids.length) { out.instB = new InstancedPeople(mids); root.add(out.instB.bodies, out.instB.heads); }
   if (level.crowd > 0) {
     const area = { x0: -V.width / 2 + 1, x1: V.width / 2 - 1, z0: rowZ, z1: Math.max(audZ1 + 1, rowZ - 16), y: -drop };
     out.crowd = new Crowd(level.crowd, area);

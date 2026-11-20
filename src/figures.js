@@ -52,18 +52,34 @@ const G = {
   seat: new THREE.BoxGeometry(0.46, 0.45, 0.46),
 };
 
-function look(seed) {
-  return { skin: pick(SKIN), hair: pick(HAIR), shirt: pick(CLOTH), pants: pick(CLOTH) };
+function look() {
+  return {
+    skin: pick(SKIN), hair: pick(HAIR), shirt: pick(CLOTH), pants: pick(CLOTH), cap: pick(CLOTH),
+    hairStyle: pick(['short', 'short', 'short', 'long', 'long', 'bun', 'cap', 'bald']),
+    glasses: Math.random() < 0.25,
+    height: rand(0.9, 1.1), build: rand(0.86, 1.18),        // 키와 체격
+  };
 }
 
-function headGeometry(L, detailed) {
+// 머리 모양을 사람마다 다르게: 짧은 머리, 긴 머리, 묶은 머리, 모자, 민머리 + 안경·코
+function headGeometry(L) {
   const parts = [
     { geo: G.head, color: L.skin },
-    { geo: G.hair, color: L.hair, matrix: M(0, 0.012, -0.012, -0.25, 0, 0) },
+    { geo: G.eye, color: 0x101010, matrix: M(-0.045, 0.02, 0.105) },
+    { geo: G.eye, color: 0x101010, matrix: M(0.045, 0.02, 0.105) },
+    { geo: new THREE.BoxGeometry(0.022, 0.035, 0.03), color: L.skin, matrix: M(0, -0.012, 0.118) },
   ];
-  if (detailed || true) {
-    parts.push({ geo: G.eye, color: 0x101010, matrix: M(-0.045, 0.02, 0.105) });
-    parts.push({ geo: G.eye, color: 0x101010, matrix: M(0.045, 0.02, 0.105) });
+  const style = L.hairStyle;
+  if (style !== 'bald') parts.push({ geo: G.hair, color: L.hair, matrix: M(0, 0.012, -0.012, -0.25, 0, 0) });
+  if (style === 'long') parts.push({ geo: new THREE.BoxGeometry(0.25, 0.26, 0.09), color: L.hair, matrix: M(0, -0.08, -0.07) });
+  if (style === 'bun') parts.push({ geo: new THREE.SphereGeometry(0.055, 8, 6), color: L.hair, matrix: M(0, 0.1, -0.1) });
+  if (style === 'cap') {
+    parts.push({ geo: new THREE.SphereGeometry(0.13, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.5), color: L.cap, matrix: M(0, 0.02, 0) });
+    parts.push({ geo: new THREE.BoxGeometry(0.2, 0.012, 0.12), color: L.cap, matrix: M(0, 0.05, 0.13, 0.1, 0, 0) });
+  }
+  if (L.glasses) {
+    parts.push({ geo: new THREE.TorusGeometry(0.026, 0.004, 4, 12), color: 0x1a1a1a, matrix: M(-0.045, 0.02, 0.112) });
+    parts.push({ geo: new THREE.TorusGeometry(0.026, 0.004, 4, 12), color: 0x1a1a1a, matrix: M(0.045, 0.02, 0.112) });
   }
   return merge(parts);
 }
@@ -82,14 +98,17 @@ export class Person {
     const shoulderY = hip + 0.58;
     const headY = hip + 0.78;
 
-    const bodyParts = [{ geo: G.torso, color: L.shirt, matrix: M(0, torsoY, 0) }];
-    if (seated) bodyParts.push({ geo: G.legs, color: L.pants, matrix: M(0, 0.48, 0.18, Math.PI / 2, 0, 0, 0.75) });
-    else bodyParts.push({ geo: G.legs, color: L.pants, matrix: M(0, 0.4, 0) });
+    this.look = L;
     if (tier === 'B') {
-      bodyParts.push({ geo: G.arm, color: L.shirt, matrix: M(-0.27, torsoY, 0) });
-      bodyParts.push({ geo: G.arm, color: L.shirt, matrix: M(0.27, torsoY, 0) });
+      // 중간 줄은 실제 메시를 만들지 않고 위치만 잡아 두고, InstancedPeople이 한 번에 그린다
+      this.bodyAnchor = new THREE.Object3D();
+      this.body.add(this.bodyAnchor);
+    } else {
+      const bodyParts = [{ geo: G.torso, color: L.shirt, matrix: M(0, torsoY, 0) }];
+      if (seated) bodyParts.push({ geo: G.legs, color: L.pants, matrix: M(0, 0.48, 0.18, Math.PI / 2, 0, 0, 0.75) });
+      else bodyParts.push({ geo: G.legs, color: L.pants, matrix: M(0, 0.4, 0) });
+      this.body.add(new THREE.Mesh(merge(bodyParts), vtxMat));
     }
-    this.body.add(new THREE.Mesh(merge(bodyParts), vtxMat));
 
     if (tier === 'A') {
       this.arms = [-1, 1].map((s) => {
@@ -105,7 +124,12 @@ export class Person {
     this.neck = new THREE.Group();
     this.neck.position.set(0, headY, 0);
     this.body.add(this.neck);
-    this.head = new THREE.Mesh(headGeometry(L, tier === 'A'), vtxMat);
+    this.head = tier === 'B' ? new THREE.Object3D() : new THREE.Mesh(headGeometry(L), vtxMat);
+    // 키와 체격 (앉은 사람은 덜 다르게)
+    const h = seated ? 1 + (L.height - 1) * 0.4 : L.height;
+    this.root.scale.set(L.build, h, L.build);
+    this.phase = Math.random() * 10;
+    this.idleSway = rand(0.015, 0.04);
     this.neck.add(this.head);
     if (tier === 'A') {
       this.brows = new THREE.Mesh(merge([
@@ -243,23 +267,29 @@ export class Person {
       this.mouth.position.y = -0.055 + this.exprNow.smile * 0.004;
     }
 
+    // 가만히 있을 때도 사람처럼: 숨쉬기와 체중 이동
+    this.body.scale.y = 1 + Math.sin(now * 1.6 + this.phase) * 0.006;
+    if (!lean) this.body.rotation.z = Math.sin(now * 0.45 + this.phase) * this.idleSway;
+
     // 박수·환호
     if (this.clap > 0) {
       this.clap -= dt;
       const ph = Math.sin(now * 20 + this.bob) * 0.5 + 0.5;
+      this.body.position.y = Math.abs(Math.sin(now * 8 + this.bob)) * (this.seated ? 0.015 : 0.035);
       if (this.arms) {
         this.arms[0].rotation.set(-1.2, 0, -0.5 + ph * 0.35);
         this.arms[1].rotation.set(-1.2, 0, 0.5 - ph * 0.35);
-      } else this.body.position.y = Math.abs(Math.sin(now * 8 + this.bob)) * 0.04;
+      }
     } else if (this.arms && this.state === 'write') {
       this.arms[1].rotation.set(-0.95 + Math.sin(now * 14) * 0.08, 0, Math.sin(now * 9) * 0.1);
       this.arms[0].rotation.set(0, 0, 0);
     } else if (this.arms && this.state === 'watch') {
       this.arms[0].rotation.set(-1.4, 0, 0.6);
     } else if (this.arms && !this.phone) {
-      this.arms[0].rotation.set(0, 0, 0);
-      this.arms[1].rotation.set(0, 0, 0);
-    } else if (!this.arms) this.body.position.y = 0;
+      this.arms[0].rotation.set(0, 0, 0.04);
+      this.arms[1].rotation.set(0, 0, -0.04);
+      this.body.position.y = 0;
+    } else this.body.position.y = 0;
   }
 
   headWorld(out) {
@@ -300,18 +330,62 @@ export class Crowd {
     this._s = new THREE.Vector3();
   }
   update(dt, now) {
-    if (this.cheer <= 0 && !this._dirty) return;
+    this._frame = (this._frame || 0) + 1;
+    if (this.cheer <= 0 && this._frame % 3) return;
     this.cheer = Math.max(0, this.cheer - dt);
-    for (let i = 0; i < this.base.length; i++) {
+    const e = this._e || (this._e = new THREE.Euler());
+    for (let i = 0; i < this.mesh.count; i++) {
       const b = this.base[i];
       const jump = this.cheer > 0 ? Math.max(0, Math.sin(now * 7 + b.ph)) * 0.08 : 0;
       this._v.set(b.x, this.y + jump, b.z);
-      this._q.setFromEuler(new THREE.Euler(0, b.ry, 0));
+      this._q.setFromEuler(e.set(0, b.ry, Math.sin(now * 0.45 + b.ph) * 0.03));
       this._s.set(b.s, b.s, b.s);
       this._m.compose(this._v, this._q, this._s);
       this.mesh.setMatrixAt(i, this._m);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
     this._dirty = this.cheer > 0;
+  }
+}
+
+// 중간 줄 관객(Tier B): 몸과 머리를 각각 InstancedMesh 하나로 그린다 (그리기 호출 2번).
+// 사람마다의 움직임(고개 돌림, 몸 기울임)은 Person 객체가 계산하고, 그 행렬을 복사해 온다.
+export class InstancedPeople {
+  constructor(people) {
+    this.people = people;
+    const seated = people[0].seated;
+    const hip = seated ? 0.45 : 0.8, torsoY = hip + 0.31;
+    const bodyParts = [
+      { geo: G.torso, color: 0xffffff, matrix: M(0, torsoY, 0) },
+      { geo: G.arm, color: 0xffffff, matrix: M(-0.27, torsoY, 0) },
+      { geo: G.arm, color: 0xffffff, matrix: M(0.27, torsoY, 0) },
+      seated ? { geo: G.legs, color: 0x5a5a5a, matrix: M(0, 0.48, 0.18, Math.PI / 2, 0, 0, 0.75) } : { geo: G.legs, color: 0x5a5a5a, matrix: M(0, 0.4, 0) },
+    ];
+    const headParts = [
+      { geo: new THREE.SphereGeometry(0.12, 10, 8), color: 0xffffff },
+      { geo: G.hair, color: 0x3a3330, matrix: M(0, 0.012, -0.012, -0.25, 0, 0) },
+      { geo: G.eye, color: 0x101010, matrix: M(-0.045, 0.02, 0.105) },
+      { geo: G.eye, color: 0x101010, matrix: M(0.045, 0.02, 0.105) },
+    ];
+    const n = people.length;
+    this.bodies = new THREE.InstancedMesh(merge(bodyParts), vtxMat, n);
+    this.heads = new THREE.InstancedMesh(merge(headParts), vtxMat, n);
+    for (const m of [this.bodies, this.heads]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; }
+    const c = new THREE.Color();
+    people.forEach((p, i) => {
+      this.bodies.setColorAt(i, c.set(p.look.shirt));
+      this.heads.setColorAt(i, c.set(p.look.skin));
+    });
+    this.count = n;
+  }
+  setCount(k) { this.count = Math.max(0, Math.min(this.people.length, k)); this.bodies.count = this.heads.count = this.count; }
+  update() {
+    for (let i = 0; i < this.count; i++) {
+      const p = this.people[i];
+      this.bodies.setMatrixAt(i, p.bodyAnchor.matrixWorld);
+      this.heads.setMatrixAt(i, p.head.matrixWorld);
+    }
+    this.bodies.instanceMatrix.needsUpdate = true;
+    this.heads.instanceMatrix.needsUpdate = true;
   }
 }

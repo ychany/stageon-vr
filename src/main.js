@@ -1,14 +1,14 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js?v=202611202306';
-import { buildVenue } from './venue.js?v=202611202306';
-import { AudioEngine } from './audio.js?v=202611202306';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611202306';
-import { InstrumentInput } from './mic.js?v=202611202306';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js?v=202611202306';
-import { FloatingPanel, drawReport } from './ui.js?v=202611202306';
-import { Person, rand } from './figures.js?v=202611202306';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611202306';
+import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js?v=202611202321';
+import { buildVenue } from './venue.js?v=202611202321';
+import { AudioEngine } from './audio.js?v=202611202321';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611202321';
+import { InstrumentInput } from './mic.js?v=202611202321';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js?v=202611202321';
+import { FloatingPanel, drawReport } from './ui.js?v=202611202321';
+import { Person, rand } from './figures.js?v=202611202321';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611202321';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -124,6 +124,9 @@ $('#startDesktop').addEventListener('click', () => begin(false));
 $('#startVR').addEventListener('click', () => begin(true));
 
 async function begin(vr) {
+  S.participant = $('#participant').value.trim();
+  S.mode = $('input[name=mode]:checked').value;
+  if (S.mode !== 'vr') return beginMeasure(S.mode);
   const sc = SCENARIOS[Number($('input[name=scenario]:checked').value)];
   const level = LEVELS[sc.level];
   S.sc = sc;
@@ -171,6 +174,7 @@ async function begin(vr) {
     await renderer.xr.setSession(session);
     session.addEventListener('end', () => { if (S.phase !== 'report') emergencyStop('헤드셋 세션 종료'); });
     setupControllers();
+    setupHands();
   }
   setPhase('backstage');
 }
@@ -392,6 +396,7 @@ function onOnset(t) {
 
 function onMistake(source) {
   if (S.phase !== 'perform') return;
+  if (!S.venue) { S.mistakes.push(S.t); S.tracker.onMistake(S.t, S.lastRatio); log(`실수 (${source})`); return; }
   const now = S.t;
   S.mistakes.push(now);
   S.tracker.onMistake(now, S.lastRatio);
@@ -572,7 +577,7 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('keyup', (e) => keys.delete(e.code));
 // 테스트·시연에서 버튼으로 실수를 넣을 수 있게 노출
-window.stageon = { mistake: () => onMistake('수동 입력'), state: S, setPhase, emergencyStop, camera, look: (y, p) => { yaw = y; pitch = p; } };
+window.stageon = { mistake: () => onMistake('수동 입력'), state: S, setPhase, emergencyStop, camera, renderer, scene, look: (y, p) => { yaw = y; pitch = p; } };
 
 function desktopMove(dt) {
   camera.rotation.set(pitch, yaw, 0, 'YXZ');
@@ -610,6 +615,69 @@ function setupControllers() {
   }
 }
 const prevButtons = new Map();
+// ---------- 손 추적: 컨트롤러 없이 오른손으로 줄을 긁어 연주 ----------
+const hands = {};
+const TIPS = ['thumb-tip', 'index-finger-tip', 'middle-finger-tip', 'ring-finger-tip', 'pinky-finger-tip'];
+const tipMat = new THREE.MeshBasicMaterial({ color: 0xf1c27d });
+function setupHands() {
+  for (let i = 0; i < 2; i++) {
+    const h = renderer.xr.getHand(i);
+    h.addEventListener('connected', (e) => {
+      if (!e.data.hand) return;
+      hands[e.data.handedness] = h;
+      // 컨트롤러 마운트가 없으면 가상 악기를 몸 앞에 둔다
+      if (S.inst && !S.inst.controller && !S.inst.bodyMode) { S.inst.root.removeFromParent(); S.inst.attachBody(scene); log('손 추적: 가상 악기를 몸 앞에 배치'); }
+    });
+    h.addEventListener('disconnected', (e) => { if (e.data && hands[e.data.handedness] === h) delete hands[e.data.handedness]; });
+    scene.add(h);
+  }
+}
+const handState = { prev: new THREE.Vector3(), has: false, last: 0, tmp: new THREE.Vector3(), sp: new THREE.Vector3() };
+function pollHands(dt) {
+  for (const h of Object.values(hands)) {
+    for (const name of TIPS) {
+      const j = h.joints && h.joints[name];
+      if (j && !j.userData.vis) { j.add(new THREE.Mesh(new THREE.SphereGeometry(0.009, 8, 6), tipMat)); j.userData.vis = true; }
+    }
+  }
+  const cam = renderer.xr.getCamera();
+  if (S.inst && S.inst.bodyMode) { cam.getWorldPosition(tmp); cam.getWorldDirection(tmp2); S.inst.followBody(tmp.clone(), tmp2.clone()); }
+  // 엄지-검지 집기(pinch) 제스처: 왼손 2초 = 비상 정지, 오른손 2초 = 건너뛰기,
+  // 불안 점수 단계에서는 오른손 집기 +1 · 왼손 집기 −1 · 양손 1초 = 확정
+  const pinch = {};
+  for (const side of ['left', 'right']) {
+    const h = hands[side];
+    const a = h && h.joints && h.joints['thumb-tip'], b = h && h.joints && h.joints['index-finger-tip'];
+    pinch[side] = !!(a && b && a.position.distanceTo(b.position) < 0.02);
+    const st = handState[side] || (handState[side] = { since: null, fired: false });
+    if (pinch[side]) { if (st.since === null) { st.since = S.t; st.fired = false; } }
+    else {
+      if (st.since !== null && !st.fired && S.phase === 'suds' && S.t - st.since < 0.6) setSuds(S.sudsPost + (side === 'right' ? 1 : -1));
+      st.since = null;
+    }
+  }
+  const held = (side, sec) => handState[side] && handState[side].since !== null && !handState[side].fired && S.t - handState[side].since > sec;
+  if (S.phase === 'suds') {
+    if (held('left', 1) && held('right', 1)) { handState.left.fired = handState.right.fired = true; setSuds(S.sudsPost, true); }
+  } else {
+    if (held('left', 2)) { handState.left.fired = true; emergencyStop('손 제스처'); }
+    if (held('right', 2)) { handState.right.fired = true; skip(); }
+  }
+
+  const right = hands.right;
+  const tip = right && right.joints && right.joints['index-finger-tip'];
+  if (!tip || !S.inst) { handState.has = false; return; }
+  tip.getWorldPosition(handState.tmp);
+  if (handState.has && dt > 0) {
+    const vy = (handState.tmp.y - handState.prev.y) / dt;
+    const near = handState.tmp.distanceTo(S.inst.strumPoint(handState.sp)) < 0.22;
+    // 몸통 근처에서 빠르게 아래로 긁으면 스트럼 (0.12초 안에 다시 인식하지 않음)
+    if (near && vy < -0.7 && S.t - handState.last > 0.12) { handState.last = S.t; strum(); }
+  }
+  handState.prev.copy(handState.tmp);
+  handState.has = true;
+}
+
 function pollXRInput() {
   const session = renderer.xr.getSession();
   if (!session) return;
@@ -647,13 +715,36 @@ function haptic(intensity, ms) {
 }
 
 // ---------- 매 프레임 ----------
+// ---------- 프레임 유지: VR에서 목표 주사율보다 계속 느리면 단계적으로 부담을 줄인다 ----------
+const Q = { fpsEma: 0, slowFor: 0, level: 0 };
+function adaptQuality(rawDt) {
+  if (!renderer.xr.isPresenting || !S.venue) return;
+  const fps = 1 / Math.max(1e-3, rawDt);
+  Q.fpsEma = Q.fpsEma ? Q.fpsEma * 0.95 + fps * 0.05 : fps;
+  const session = renderer.xr.getSession();
+  const target = (session && session.frameRate) || 72;
+  Q.slowFor = Q.fpsEma < target * 0.85 ? Q.slowFor + rawDt : 0;
+  if (Q.slowFor > 3 && Q.level < 3) {
+    Q.level++; Q.slowFor = 0; Q.fpsEma = 0;
+    const crowd = S.venue.crowd, mids = S.venue.instB;
+    if (Q.level === 1 && session && session.updateTargetFrameRate && (session.supportedFrameRates || []).includes(72)) session.updateTargetFrameRate(72).catch(() => {});
+    if (Q.level >= 2 && crowd) crowd.mesh.count = Math.round(crowd.base.length * (Q.level === 2 ? 0.5 : 0.25));
+    if (Q.level === 3 && mids) mids.setCount(Math.ceil(mids.people.length / 2));
+    if (Q.level === 3) scene.fog = null;
+    log(`화면 끊김 감지 → 품질 ${Q.level}단계로 낮춤 (평균 ${Math.round(fps)}fps)`);
+  }
+}
+
 function frame() {
-  const dt = Math.min(0.05, clock.getDelta());
+  const rawDt = clock.getDelta();
+  adaptQuality(rawDt);
+  const dt = Math.min(0.05, rawDt);
   S.t += dt;
-  if (!S.vr) desktopMove(dt);
-  else pollXRInput();
+  if (!S.vr && S.phase !== 'replay') desktopMove(dt);
+  else if (S.vr) { pollXRInput(); pollHands(dt); }
   const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   cam.getWorldPosition(userHead);
+  if (S.phase === 'replay') replayStep();
   if (S.phase !== 'menu' && S.venue) step(dt, cam);
   panel.update(cam, dt);
   renderer.render(scene, camera);
@@ -742,6 +833,7 @@ function step(dt, cam) {
       haptic(0.5, 60);
     }
     gazeTracking(dt, cam, now);
+    recordPose(cam, now);
     breathingGuide(ratio, now);
   }
 
@@ -760,6 +852,7 @@ function step(dt, cam) {
     p.update(dt, now, ctx);
   }
   if (S.venue.crowd) S.venue.crowd.update(dt, now);
+  if (S.venue.instB) S.venue.instB.update();
   S.venue.theme.update(dt, now);
   if (S.inst) S.inst.update(dt);
   $('#skipBtn').hidden = !['backstage', 'perform', 'encore'].includes(S.phase);
@@ -839,6 +932,151 @@ function drawMonitor(k) {
   tex.needsUpdate = true;
 }
 
+// ---------- 다시 보기: 공연 중 머리 움직임을 기록했다가 관객석 시점에서 재생 ----------
+// 기획서의 “녹화 복기”. 시선을 피한 순간, 실수 후 고개를 숙인 순간을 관객 눈으로 다시 본다.
+S.rec = [];
+function recordPose(cam, now) {
+  if (S.rec.length && now - S.rec[S.rec.length - 1].t < 0.1) return;
+  cam.getWorldPosition(tmp);
+  const q = new THREE.Quaternion(); cam.getWorldQuaternion(q);
+  S.rec.push({ t: now, p: [tmp.x, tmp.y, tmp.z], q: [q.x, q.y, q.z, q.w], hr: Math.round(S.hr.bpm), ratio: S.lastRatio });
+}
+let ghost = null;
+function startReplay() {
+  if (S.rec.length < 5) return;
+  $('#report').hidden = true;
+  $('#replayBar').hidden = false;
+  panel.hide();
+  if (!ghost) {
+    ghost = new Person({ tier: 'A' });
+    ghost.root.scale.set(1, 1, 1);
+    if (S.inst) { const g = S.inst.model.clone(true); g.scale.setScalar(0.9); g.position.set(-0.45, 1.05, 0.25); g.rotation.set(0, 0, -0.5); ghost.body.add(g); }
+    scene.add(ghost.root);
+  }
+  ghost.root.visible = true;
+  // 무대 바로 앞 객석 쪽에서, 앞줄 관객 머리 너머로 무대를 본다
+  const drop = S.level.venue.floorDrop;
+  camera.position.set(1.1, Math.max(1.9, -drop + 2.3), (STAGE.stageFrontZ + STAGE.audienceStartZ) / 2);
+  camera.lookAt(0, 1.1, STAGE.stageMarkZ);
+  if (S.inst && !S.vr) S.inst.root.visible = false;
+  subtitle.mesh.visible = false;
+  S.replay = { start: S.t, t0: S.rec[0].t, i: 0, mistakeIdx: 0 };
+  S.prevPhase = S.phase;
+  S.phase = 'replay';
+  audio.setCrowdLevel(0.05, 1);
+}
+function stopReplay() {
+  if (S.phase !== 'replay') return;
+  S.phase = 'report';
+  if (ghost) ghost.root.visible = false;
+  if (S.inst) S.inst.root.visible = true;
+  $('#replayBar').hidden = true;
+  $('#report').hidden = false;
+}
+const qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
+function replayStep() {
+  const R = S.replay, rec = S.rec;
+  const tt = R.t0 + (S.t - R.start);
+  while (R.i < rec.length - 2 && rec[R.i + 1].t < tt) R.i++;
+  const a = rec[R.i], b = rec[R.i + 1] || a;
+  const k = b.t > a.t ? THREE.MathUtils.clamp((tt - a.t) / (b.t - a.t), 0, 1) : 0;
+  // 기록된 머리 위치 아래에 몸을 세우고, 머리 방향을 그대로 따라 한다
+  const hx = a.p[0] + (b.p[0] - a.p[0]) * k, hy = a.p[1] + (b.p[1] - a.p[1]) * k, hz = a.p[2] + (b.p[2] - a.p[2]) * k;
+  qa.fromArray(a.q).slerp(qb.fromArray(b.q), k);
+  const e = new THREE.Euler().setFromQuaternion(qa, 'YXZ');
+  ghost.root.position.set(hx, 0, hz);
+  ghost.root.rotation.y = e.y + Math.PI;          // 인물 모델은 +z가 앞
+  ghost.neck.rotation.set(-e.x, 0, 0);
+  ghost.body.scale.y = THREE.MathUtils.clamp(hy / 1.58, 0.85, 1.15);
+  userHead.set(hx, hy, hz);                        // 관객은 재생 속 연주자를 본다
+  while (R.mistakeIdx < S.mistakes.length && S.mistakes[R.mistakeIdx] <= tt) {
+    R.mistakeIdx++;
+    $('#replayFlag').textContent = '실수!';
+    setTimeout(() => { $('#replayFlag').textContent = ''; }, 1200);
+  }
+  const looking = e.x < THREE.MathUtils.degToRad(TUNING.gazeAvoidPitchDeg) ? ' · 시선 회피 중' : '';
+  $('#replayText').textContent = `다시 보기 ${Math.max(0, tt - R.t0).toFixed(1)} / ${(rec[rec.length - 1].t - R.t0).toFixed(1)}초 · 심박 ${a.hr} bpm (${a.ratio >= 0 ? '+' : ''}${Math.round((a.ratio || 0) * 100)}%)${looking}`;
+  if (tt >= rec[rec.length - 1].t) stopReplay();
+}
+$('#replayBtn').addEventListener('click', startReplay);
+$('#replayStop').addEventListener('click', stopReplay);
+
+// ---------- 측정 전용 모드: 기준선 측정, 실험 A의 연습실·실제 관객 조건 ----------
+// VR 화면 없이 같은 반주·같은 곡 길이로 심박(과 악기 입력이 있으면 박자 실수)을 기록해 같은 형식의 JSON을 남긴다.
+const MEASURE = {
+  baseline: { title: '기준선 측정', desc: '편한 상태로 60초 동안 반주에 맞춰 평소처럼 연주하세요. 이 값이 모든 비교의 기준선이 됩니다.', bars: 25 },
+  practice: { title: '조건 A · 혼자 연습실', desc: '혼자 있는 연습실에서 같은 곡을 연주합니다. 헤드셋은 쓰지 않습니다.' },
+  real: { title: '조건 C · 실제 관객 앞', desc: '실제 관객 앞에서 같은 곡을 연주합니다. 헤드셋은 쓰지 않습니다.' },
+};
+async function beginMeasure(kind) {
+  const sc = SCENARIOS[Number($('input[name=scenario]:checked').value)];
+  S.sc = sc; S.level = LEVELS[sc.level]; S.name = $('#name').value.trim() || '연주자'; S.vr = false;
+  S.cues = { gaze: true, eval: true, mistake: true, events: true, body: true };
+  $('#menu').hidden = true;
+  await audio.init(LEVELS[1]);
+  S.hr = btHR || new SimulatedHeartRate(72);
+  S.director = new StressorDirector(S.level, TUNING);
+  S.tracker = new RecoveryTracker(TUNING, (60 / TUNING.bpm) * 4);
+  S.judge = new TimingJudge({ thresholdSec: TUNING.timingErrorSec });
+  if ($('#useMic').checked) {
+    try { S.mic = new InstrumentInput(audio); await S.mic.enable({ reverbMonitor: false }); S.mic.onOnset = measureOnset; }
+    catch (e) { S.mic = null; }
+  }
+  const M = MEASURE[kind];
+  $('#measureTitle').textContent = M.title;
+  $('#measureDesc').textContent = M.desc;
+  $('#measureWarn').hidden = !S.hr.simulated;
+  $('#measure').hidden = false;
+  $('#measureStart').onclick = () => startMeasure(kind);
+}
+function measureOnset(t) {
+  if (S.phase !== 'perform' || !audio.gridStart || t < audio.gridStart) return;
+  if (S.judge.onset(t, audio.gridStart, audio.beatSec).mistake) { S.mistakes.push(S.t); S.tracker.onMistake(S.t, S.lastRatio); }
+}
+function startMeasure(kind) {
+  const bars = MEASURE[kind].bars || S.sc.bars;
+  $('#measureStart').hidden = true;
+  S.phase = 'perform';
+  const t0 = performance.now();
+  if (kind !== 'baseline') S.baseline = computeBaseline();
+  const total = (TUNING.countInBeats + bars * 4) * 60 / TUNING.bpm;
+  let last = 0;
+  S.measureTimer = setInterval(() => {
+    const now = (performance.now() - t0) / 1000, dt = now - last;
+    last = now;
+    S.t = now;
+    S.hr.update(dt);
+    const bpm = S.hr.bpm;
+    if (Number.isFinite(bpm)) S.hrAvg.push(now, bpm);
+    const base = Number.isFinite(S.baseline) ? S.baseline : S.hrAvg.value;
+    const ratio = S.hrAvg.value / base - 1;
+    S.lastRatio = ratio;
+    if (S.hr.simulated) S.hr.setPressure(kind === 'real' ? 0.3 : 0.06);
+    S.hrLog.push({ t: now, hr: bpm, ratio, phase: 'perform', intensity: 0, calm: false });
+    S.peakRatio = Math.max(S.peakRatio, ratio);
+    const rec = S.tracker.update(now, ratio); if (rec !== null) log(`회복 ${rec.toFixed(1)}초`);
+    $('#measureLive').textContent = `${Math.min(total, now).toFixed(0)} / ${total.toFixed(0)}초 · 심박 ${Math.round(bpm)} bpm${kind === 'baseline' ? '' : ` (기준선 대비 ${ratio >= 0 ? '+' : ''}${Math.round(ratio * 100)}%)`} · 실수 ${S.mistakes.length}`;
+  }, 250);
+  audio.startBand({
+    bpm: TUNING.bpm, bars, countIn: TUNING.countInBeats,
+    drummerPos: new THREE.Vector3(0.8, 1, -1), bassPos: new THREE.Vector3(-0.8, 1, -1),
+    onEnd: () => endMeasure(kind),
+  });
+}
+function endMeasure(kind) {
+  clearInterval(S.measureTimer);
+  if (kind === 'baseline') {
+    const vals = S.hrLog.filter((p) => p.t > 10).map((p) => p.hr);   // 처음 10초(안정화)는 뺀다
+    const mean = vals.reduce((a, b) => a + b, 0) / Math.max(1, vals.length);
+    try { localStorage.setItem('stageon.baseline', String(mean)); } catch { /* 무시 */ }
+    $('#measureLive').textContent = `기준선 ${Math.round(mean)} bpm을 저장했습니다${S.hr.simulated ? ' (시뮬레이션 심박)' : ''}. 이후 모든 공연은 이 값을 기준으로 비교합니다.`;
+    $('#measureDone').hidden = false;
+    return;
+  }
+  $('#measure').hidden = true;
+  setPhase('suds');
+}
+
 // ---------- 주관적 불안 점수 (SUDs) ----------
 function drawSudsPanel() {
   panel.show('지금 불안은 몇 점인가요?', [
@@ -875,7 +1113,8 @@ function reportData() {
     hr: S.hrLog, mistakes: S.mistakes, recoveries: S.tracker.recoveries,
     peakRatio: S.peakRatio,
     gazeAvoidRatio: S.performTime ? S.gazeAvoid / S.performTime : 0,
-    eyeContacts: S.eyeContacts, director: S.director.log, events: S.events, suds: S.sudsLog,
+    eyeContacts: S.eyeContacts, director: S.director.log, events: S.events, suds: S.sudsLog, qualityLevel: Q.level,
+    condition: S.mode || 'vr', participant: S.participant || null,
     sudsPost: S.sudsPost ?? null, cues: S.cues, meanRatio: meanPerformRatio(),
   };
 }
@@ -887,14 +1126,14 @@ function showReport() {
   audio.setHeartbeatVolume(0);
   audio.setCrowdLevel(0.15, 2);
   const data = reportData();
-  const prev = loadHistory().filter((h) => h.scenario === data.scenario);
+  const prev = loadHistory().filter((h) => h.scenario === data.scenario && (h.condition || 'vr') === data.condition);
   data.session = prev.length + 1;
   data.prevMeanRatio = prev.length ? prev[prev.length - 1].meanRatio : null;
   saveHistory({
     date: new Date().toISOString(), scenario: data.scenario, level: data.level, meanRatio: data.meanRatio,
     peakRatio: data.peakRatio, mistakes: data.mistakes.length, suds: data.sudsPost,
     recovery: data.recoveries.length ? data.recoveries.reduce((a, b) => a + b, 0) / data.recoveries.length : null,
-    simulated: S.hr.simulated, cues: S.cues,
+    simulated: S.hr.simulated, cues: S.cues, condition: data.condition, participant: data.participant,
   });
   const rows = [...prev.slice(-4), { date: new Date().toISOString(), meanRatio: data.meanRatio, mistakes: data.mistakes.length, suds: data.sudsPost, now: true }];
   const pct = (r) => (Number.isFinite(r) ? `${r >= 0 ? '+' : ''}${Math.round(r * 100)}%` : '–');
@@ -904,12 +1143,13 @@ function showReport() {
   drawReport(c, data);
   panel.showCanvas(c);
   $('#report').hidden = false;
+  $('#replayBtn').hidden = S.vr || S.rec.length < 5;
   if (document.pointerLockElement) document.exitPointerLock();
   $('#download').onclick = () => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `stageon_Lv${data.level}_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+    a.download = `stageon_${data.participant ? data.participant + '_' : ''}${data.condition}_Lv${data.level}_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
     a.click();
   };
 }
@@ -924,7 +1164,7 @@ function log(msg) {
   el.prepend(line);
   while (el.childNodes.length > 14) el.removeChild(el.lastChild);
 }
-const PHASE = { menu: '시작 전', backstage: '대기실', call: '호명·입장', hush: '첫 소절 직전', perform: '연주 중', encore: '앵콜 요청', finish: '종료', suds: '불안 점수', report: '리포트', stopped: '비상 정지' };
+const PHASE = { menu: '시작 전', backstage: '대기실', call: '호명·입장', hush: '첫 소절 직전', perform: '연주 중', encore: '앵콜 요청', finish: '종료', suds: '불안 점수', replay: '다시 보기', report: '리포트', stopped: '비상 정지' };
 function updateHud(ratio) {
   if (!S.level) return;
   const p = S.director ? P() : {};

@@ -21,6 +21,18 @@
     </label>
 
     <fieldset>
+      <legend>모드</legend>
+      <label><input type="radio" name="mode" value="vr" checked> <b>VR 무대 훈련</b> (실험 조건 B)</label>
+      <label><input type="radio" name="mode" value="baseline"> <b>기준선 측정</b> · 60초 편하게 연주 (실험 전에 한 번)</label>
+      <label><input type="radio" name="mode" value="practice"> <b>측정 전용: 혼자 연습실</b> (실험 조건 A, 헤드셋 없이)</label>
+      <label><input type="radio" name="mode" value="real"> <b>측정 전용: 실제 관객 앞</b> (실험 조건 C, 헤드셋 없이)</label>
+      <label class="field" style="margin:8px 0 0">참가자 번호 <span class="hint">실험할 때만, 저장 파일 이름과 리포트에 들어감</span>
+        <input id="participant" type="text" maxlength="12" placeholder="예: P01">
+      </label>
+      <p class="hint" style="margin:6px 0 0">측정 전용 모드는 같은 반주·같은 곡 길이로 심박을 기록합니다. 실제 심박을 쓰려면 PC Chrome에서 심박 센서를 연결하세요.</p>
+    </fieldset>
+
+    <fieldset>
       <legend>시나리오</legend>
       <div id="scenarios"></div>
       <p id="loadError" class="error" hidden></p>
@@ -78,10 +90,23 @@
   <div id="history"></div>
   <div class="row buttons">
     <button id="again" class="primary" type="button">다시 하기</button>
+    <button id="replayBtn" type="button">관객 시점으로 다시 보기</button>
     <button id="download" type="button">데이터 저장 (JSON)</button>
   </div>
 </div>
 
+<div id="measure" hidden>
+  <div class="card">
+    <p class="eyebrow">측정 전용 모드</p>
+    <h1 id="measureTitle" style="font-size:40px"></h1>
+    <p id="measureDesc" class="lead"></p>
+    <p id="measureWarn" class="error" hidden>심박 센서가 연결되지 않아 시뮬레이션 심박으로 기록됩니다. 실험 데이터로 쓰지 마세요.</p>
+    <button id="measureStart" class="primary" type="button">시작 (반주 카운트 후 연주)</button>
+    <p id="measureLive" style="font-size:22px;font-weight:700;margin-top:20px"></p>
+    <button id="measureDone" type="button" hidden onclick="location.reload()">처음으로</button>
+  </div>
+</div>
+<div id="replayBar" hidden><span id="replayText"></span><b id="replayFlag"></b><button id="replayStop" type="button">리포트로</button></div>
 <div id="sudsBox" hidden></div>
 <div id="breath" hidden>들숨</div>
 <div id="stopped" hidden>
@@ -99,6 +124,6 @@
   window.addEventListener('unhandledrejection', function (e) { stageonError(String(e.reason && e.reason.message || e.reason)); });
   setTimeout(function () { if (!document.querySelector('input[name=scenario]')) stageonError('시나리오 목록을 불러오지 못했습니다'); }, 4000);
 </script>
-<script type="module" src="src/main.js?v=202611202306"></script>
+<script type="module" src="src/main.js?v=202611202321"></script>
 </body>
 </html>

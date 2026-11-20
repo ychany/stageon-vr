@@ -2,7 +2,7 @@
 // (몰입감 Vividness, Presence의 Stable Spatial Place).
 // 움직이지 않는 장식은 merge()로 한 덩어리로 합쳐 그리기 호출 수를 줄인다.
 import * as THREE from 'three';
-import { merge } from './figures.js?v=202611202306';
+import { merge } from './figures.js?v=202611202321';
 
 const R = (a, b) => a + Math.random() * (b - a);
 const M = (x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) =>
@@ -92,7 +92,7 @@ export function decorate(scene, root, level, d) {
       bulbs.push({ geo: new THREE.SphereGeometry(0.03, 6, 5), color: 0xffd38a, matrix: M(x, y0 + Hh - 0.25 - sag, d.audZ0 - 0.5 - k * 2.4) });
     }
     root.add(new THREE.Mesh(merge(bulbs), glowMat()));
-    for (const z of [d.audZ0 - 1, d.audZ0 - 4]) { const l = new THREE.PointLight(0xffc27a, 5, 7, 1.3); l.position.set(0, y0 + Hh - 0.6, z); root.add(l); }
+    const l = new THREE.PointLight(0xffc27a, 8, 10, 1.2); l.position.set(0, y0 + Hh - 0.6, d.audZ0 - 2.5); root.add(l);
   }
 
   if (level.id === 3) {
@@ -114,13 +114,21 @@ export function decorate(scene, root, level, d) {
       root.add(p);
     }
     scene.fog = new THREE.FogExp2(0x140a1e, 0.035);
+    // (성능) 움직이는 조명은 실제 광원 대신 빛줄기 메시 + 색이 바뀌는 광원 하나로 표현
+    const beamGeo = new THREE.ConeGeometry(0.9, 9, 20, 1, true); beamGeo.translate(0, -4.5, 0);
     const movers = [0xff3fa8, 0x3fb8ff, 0xa04bff].map((c, i) => {
-      const l = new THREE.SpotLight(c, 80, 20, 0.35, 0.5, 1.2);
-      l.position.set(-3 + i * 3, y0 + Hh - 0.3, d.stageFrontZ - 0.5);
-      root.add(l, l.target);
-      return l;
+      const m = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.09, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      m.position.set(-3 + i * 3, y0 + Hh - 0.3, d.stageFrontZ - 0.5);
+      root.add(m);
+      return m;
     });
-    T.update = (dt, t) => movers.forEach((l, i) => l.target.position.set(Math.sin(t * 0.5 + i * 2) * 5, y0, zMid + Math.cos(t * 0.4 + i) * 4));
+    const tint = new THREE.PointLight(0xff3fa8, 10, 14, 1.2); tint.position.set(0, y0 + Hh - 1, zMid); root.add(tint);
+    const cols = [new THREE.Color(0xff3fa8), new THREE.Color(0x3fb8ff), new THREE.Color(0xa04bff)];
+    T.update = (dt, t) => {
+      movers.forEach((m, i) => m.rotation.set(Math.sin(t * 0.5 + i * 2) * 0.6 - 0.3, 0, Math.cos(t * 0.4 + i) * 0.7));
+      const k = (t * 0.25) % 3, a = Math.floor(k), f = k - a;
+      tint.color.copy(cols[a]).lerp(cols[(a + 1) % 3], f);
+    };
   }
 
   if (level.id === 4) {
