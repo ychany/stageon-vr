@@ -1,8 +1,9 @@
 // 공연장 구성: 대기실 → (실제로 걷는) 무대 → 객석.
 // 사용자가 헤드셋을 쓴 지점이 대기실이고, 정면으로 STAGE.stageMarkZ 만큼 걸어가면 무대 중앙이다.
 import * as THREE from 'three';
-import { STAGE } from './config.js?v=202611202258';
-import { Person, Crowd, rand, merge } from './figures.js?v=202611202258';
+import { STAGE } from './config.js?v=202611202306';
+import { decorate } from './themes.js?v=202611202306';
+import { Person, Crowd, rand, merge } from './figures.js?v=202611202306';
 
 const lam = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 
@@ -125,11 +126,13 @@ export function buildVenue(scene, level) {
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(V.width, V.depth), lam(0x1d1b20));
   floor.rotation.x = -Math.PI / 2; floor.position.set(0, -drop, (audZ0 + audZ1) / 2);
   root.add(floor);
+  // 시나리오별 꾸미기 (야외 페스티벌이면 벽과 천장 없음)
+  out.theme = decorate(scene, root, level, { width: V.width, height: V.height, drop, audZ0, audZ1, curtainZ: STAGE.curtainZ, stageFrontZ: STAGE.stageFrontZ, stageWidth: STAGE.stageWidth });
   const hallMat = lam(V.wall, { side: THREE.BackSide });
   const hallH = V.height + drop;
   const hall = new THREE.Mesh(new THREE.BoxGeometry(V.width, hallH, V.depth + stageDepth + 0.2), hallMat);
   hall.position.set(0, -drop + hallH / 2, (audZ1 + STAGE.curtainZ) / 2);
-  root.add(hall);
+  if (!out.theme.outdoor) root.add(hall);
   // 출입문 빛 (늦게 들어온 관객이 나오는 곳)
   out.doorPos = new THREE.Vector3(-V.width / 2 + 0.3, -drop, audZ1 + 1.5);
   box(0.05, 2.1, 1.0, -V.width / 2 + 0.03, -drop + 1.05, audZ1 + 1.5, new THREE.MeshBasicMaterial({ color: 0x3a6a3a }));

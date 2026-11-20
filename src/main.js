@@ -1,14 +1,14 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js?v=202611202258';
-import { buildVenue } from './venue.js?v=202611202258';
-import { AudioEngine } from './audio.js?v=202611202258';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611202258';
-import { InstrumentInput } from './mic.js?v=202611202258';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js?v=202611202258';
-import { FloatingPanel, drawReport } from './ui.js?v=202611202258';
-import { Person, rand } from './figures.js?v=202611202258';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611202258';
+import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js?v=202611202306';
+import { buildVenue } from './venue.js?v=202611202306';
+import { AudioEngine } from './audio.js?v=202611202306';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611202306';
+import { InstrumentInput } from './mic.js?v=202611202306';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js?v=202611202306';
+import { FloatingPanel, drawReport } from './ui.js?v=202611202306';
+import { Person, rand } from './figures.js?v=202611202306';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611202306';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -760,6 +760,7 @@ function step(dt, cam) {
     p.update(dt, now, ctx);
   }
   if (S.venue.crowd) S.venue.crowd.update(dt, now);
+  S.venue.theme.update(dt, now);
   if (S.inst) S.inst.update(dt);
   $('#skipBtn').hidden = !['backstage', 'perform', 'encore'].includes(S.phase);
 
