@@ -1,7 +1,7 @@
 // 가상 악기: 실물 악기 위에 겹쳐 보이는 기타/베이스와 연주 소리.
 // 보고서 2-5: 악기 헤드에 컨트롤러를 달고(마운트), 가상 악기를 실물 위치에 1:1로 맞춘다.
 import * as THREE from 'three';
-import { merge } from './figures.js?v=202611210226';
+import { merge } from './figures.js?v=202611210235';
 
 const TYPES = {
   guitar: { name: '일렉 기타', strings: 6, scale: 0.65, body: 0xb3261e, neck: 0x6b4423, open: [40, 45, 50, 55, 59, 64] },

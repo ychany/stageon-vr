@@ -1,16 +1,16 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611210226';
-import { buildVenue } from './venue.js?v=202611210226';
-import { AudioEngine } from './audio.js?v=202611210226';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611210226';
-import { InstrumentInput } from './mic.js?v=202611210226';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611210226';
-import { estimateTempo } from './tempo.js?v=202611210226';
+import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611210235';
+import { buildVenue } from './venue.js?v=202611210235';
+import { AudioEngine } from './audio.js?v=202611210235';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611210235';
+import { InstrumentInput } from './mic.js?v=202611210235';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611210235';
+import { estimateTempo } from './tempo.js?v=202611210235';
 import qrcode from '../vendor/qrcode.mjs';
-import { FloatingPanel, drawReport } from './ui.js?v=202611210226';
-import { Person, rand } from './figures.js?v=202611210226';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611210226';
+import { FloatingPanel, drawReport } from './ui.js?v=202611210235';
+import { Person, rand } from './figures.js?v=202611210235';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611210235';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -503,7 +503,11 @@ function onMistake(source) {
   });
   if (p.memberLook) S.venue.band.forEach((b) => S.pending.push({ at: now + rand(0.3, 0.9), fn: () => b.eyeContact(S.t) }));
   // 실수 직후 누군가 옆 사람에게 수군거린다 (실수 → 부정적 평가로 해석하게 만드는 장면)
-  if (Math.random() < p.reaction) S.pending.push({ at: now + rand(0.8, 1.6), fn: () => audienceBehavior('whisper', '실수 직후') });
+  // 실수가 이어져도 수군거림만 반복되지 않게 8초에 한 번까지
+  if (Math.random() < p.reaction && now - (S.lastMistakeWhisper || -99) > 8) {
+    S.lastMistakeWhisper = now;
+    S.pending.push({ at: now + rand(0.8, 1.6), fn: () => audienceBehavior('whisper', '실수 직후') });
+  }
 }
 
 // ---------- 관객 행동: 관객이 '어떻게' 불안을 만드는가 ----------
@@ -1594,7 +1598,10 @@ function updateHud(ratio) {
   const p = S.director ? P() : {};
   const r = Number.isFinite(ratio) ? `${ratio >= 0 ? '+' : ''}${Math.round(ratio * 100)}%` : '–';
   $('#hudText').textContent = `Lv${S.level.id} ${S.level.name} · ${PHASE[S.phase]} · 심박 ${Math.round(S.hr ? S.hr.bpm : 0)} (${r})${S.hr && S.hr.simulated ? ' 시뮬레이션' : ''}`;
-  $('#hudSub').textContent = S.phase === 'call' ? '노란 표시까지 걸어 나가세요 (W, 또는 N으로 바로 이동)' : S.phase === 'backstage' ? '대기 중 · Space로 악기 풀기 · N 건너뛰기' : S.phase === 'perform' ? `Space로 박자에 맞춰 연주 · N 건너뛰기 · 연주 ${S.strums}번` : '';
+  const T = TOUCH && !S.vr;
+  $('#hudSub').textContent = S.phase === 'call' ? (T ? '건너뛰기를 누르면 무대로 나갑니다' : '노란 표시까지 걸어 나가세요 (W, 또는 N으로 바로 이동)')
+    : S.phase === 'backstage' ? (T ? '대기 중 · 연주 버튼으로 악기 풀기' : '대기 중 · Space로 악기 풀기 · N 건너뛰기')
+    : S.phase === 'perform' ? (T ? `연주 버튼을 박자에 맞춰 · 연주 ${S.strums}번` : `Space로 박자에 맞춰 연주 · N 건너뛰기 · 연주 ${S.strums}번`) : '';
   if (S.debug && S.director) {
     $('#debugText').textContent = [
       `기준선 ${Math.round(S.baseline || 0)} bpm (${S.baselineSource || '측정 중'})`,
