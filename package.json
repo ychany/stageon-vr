@@ -1,0 +1,12 @@
+{
+  "name": "stageon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "StageOn: 관객이 만드는 무대 불안을 훈련하는 WebXR 무대 시뮬레이터 (프로토타입)",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "start": "python3 -m http.server 8080"
+  },
+  "license": "MIT"
+}

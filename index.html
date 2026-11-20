@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StageOn 프로토타입</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="menu">
+  <div class="card">
+    <p class="eyebrow">가상증강현실의 이해 · 텀프로젝트</p>
+    <h1>StageOn</h1>
+    <p class="lead">관객이 만드는 무대 불안을 안전하게 겪고 적응하는 VR 무대</p>
+
+    <label class="field">이름 <span class="hint">사회자가 호명할 이름</span>
+      <input id="name" type="text" maxlength="20" placeholder="연주자">
+    </label>
+
+    <fieldset>
+      <legend>단계</legend>
+      <label><input type="radio" name="level" value="1"> <b>Lv1</b> 연습실 · 친구 3명</label>
+      <label><input type="radio" name="level" value="2"> <b>Lv2</b> 카페 · 20명</label>
+      <label><input type="radio" name="level" value="3" checked> <b>Lv3</b> 라이브 클럽 · 100명 + 촬영</label>
+      <label><input type="radio" name="level" value="4"> <b>Lv4</b> 오디션 · 심사위원 3명</label>
+      <label><input type="radio" name="level" value="5"> <b>Lv5</b> 페스티벌 · 500명 + 예측 불가 사건</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>입력</legend>
+      <div class="row"><button id="btConnect" type="button">심박 센서 연결 (Polar H10)</button><span id="hrStatus" class="hint">연결하지 않으면 시뮬레이션 심박</span></div>
+      <label><input id="useMic" type="checkbox"> 악기 소리 입력 (오디오 인터페이스·마이크) — 박자 실수와 정적 감지</label>
+      <label><input id="reverbMonitor" type="checkbox" checked> 내 악기 소리에 공연장 잔향 입히기</label>
+      <label><input id="demoTrigger" type="checkbox" checked> 시연 모드: 오른손 트리거 / M 키로 실수 입력</label>
+      <label class="field">아는 얼굴 사진 <span class="hint">앞줄 관객 한 명의 얼굴로 사용 (본인 동의 필요)</span>
+        <input id="photo" type="file" accept="image/*"><span id="photoName" class="hint"></span>
+      </label>
+    </fieldset>
+
+    <div class="row buttons">
+      <button id="startVR" class="primary" type="button">VR로 시작</button>
+      <button id="startDesktop" type="button">PC에서 시작</button>
+    </div>
+    <p class="hint">VR: 헤드셋을 쓴 자리가 대기실이고, 정면으로 약 2.2m 걸어 나가면 무대 중앙입니다. 앞쪽 공간을 비워 두세요.<br>
+    PC: 화면 클릭 후 마우스로 보기, W/A/S/D 이동, M 실수, ↑/↓ 심박, 0–9 주관적 불안(SUDs), G 상세 정보, Q 비상 정지.</p>
+  </div>
+</div>
+
+<div id="hud" hidden>
+  <div id="hudText"></div>
+  <div id="hudSub"></div>
+  <pre id="debug" hidden><span id="debugText"></span></pre>
+  <div id="log"></div>
+</div>
+
+<div id="report" hidden>
+  <canvas id="reportCanvas" width="1280" height="720"></canvas>
+  <div class="row buttons">
+    <button id="again" class="primary" type="button">다시 하기</button>
+    <button id="download" type="button">데이터 저장 (JSON)</button>
+  </div>
+</div>
+
+<div id="stopped" hidden>
+  <p>비상 정지되었습니다.</p>
+  <button type="button" onclick="location.reload()">처음으로</button>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
