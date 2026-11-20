@@ -1,16 +1,16 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611210219';
-import { buildVenue } from './venue.js?v=202611210219';
-import { AudioEngine } from './audio.js?v=202611210219';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611210219';
-import { InstrumentInput } from './mic.js?v=202611210219';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611210219';
-import { estimateTempo } from './tempo.js?v=202611210219';
+import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611210226';
+import { buildVenue } from './venue.js?v=202611210226';
+import { AudioEngine } from './audio.js?v=202611210226';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611210226';
+import { InstrumentInput } from './mic.js?v=202611210226';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611210226';
+import { estimateTempo } from './tempo.js?v=202611210226';
 import qrcode from '../vendor/qrcode.mjs';
-import { FloatingPanel, drawReport } from './ui.js?v=202611210219';
-import { Person, rand } from './figures.js?v=202611210219';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611210219';
+import { FloatingPanel, drawReport } from './ui.js?v=202611210226';
+import { Person, rand } from './figures.js?v=202611210226';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611210226';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -278,7 +278,7 @@ function setPhase(ph) {
   }
   if (ph === 'call') {
     if (!Number.isFinite(S.baseline)) S.baseline = computeBaseline();
-    panel.show('무대로 나가세요', ['사회자가 이름을 불렀습니다.', '바닥의 노란 표시까지 걸어 나가세요.'], { footer: '가상 이동 없이 실제로 걸어서 입장합니다' });
+    panel.show('무대로 나가세요', ['사회자가 이름을 불렀습니다.', '바닥의 노란 표시까지 걸어 나가세요.'], { footer: S.vr ? '실제로 걸어서 입장합니다 · 공간이 좁으면 B 버튼(손: 오른손 집기 2초)으로 이동' : '가상 이동 없이 실제로 걸어서 입장합니다' });
     speak(S.sc.callWho || 'mc', S.sc.call(S.name), 4);
     setTimeout(() => {
       audio.applause(S.venue.audiencePositions, 0.6, 3.5);
@@ -715,16 +715,38 @@ function calibrateInstrument() {
 function skip() {
   if (S.phase === 'backstage') setPhase('call');
   else if (S.phase === 'call' && !S.vr) { camera.position.set(0, 1.6, STAGE.stageMarkZ); }
+  else if (S.phase === 'call' && S.vr) jumpToMark();
   else if (S.phase === 'perform') { audio.stopBand(); log('연주 건너뛰기'); setPhase('finish'); }
   else if (S.phase === 'encore') { S.encoreDone = true; setPhase('suds'); }
   else if (S.phase === 'finish') setPhase('suds');
 }
 $('#skipBtn').addEventListener('click', skip);
+// VR에서 앞쪽 공간이 2.2m가 안 될 때: 걷지 않고 무대 표시 위치로 옮긴다 (기준 공간을 그만큼 밀어 준다)
+function jumpToMark() {
+  const base = renderer.xr.getReferenceSpace();
+  if (!base || typeof XRRigidTransform === 'undefined') return;
+  const m = S.venue.mark.position;
+  const dx = userHead.x - m.x, dz = userHead.z - m.z;
+  renderer.xr.setReferenceSpace(base.getOffsetReferenceSpace(new XRRigidTransform({ x: dx, y: 0, z: dz })));
+  log('공간이 좁아 무대 표시 위치로 이동');
+}
 
 // ---------- 입력: PC ----------
 const keys = new Set();
 let yaw = 0, pitch = 0;
 renderer.domElement.addEventListener('click', () => { if (!S.vr && S.phase !== 'menu' && S.phase !== 'report') renderer.domElement.requestPointerLock(); });
+// 휴대폰·태블릿: 화면을 끌어서 둘러보고, 연주 버튼으로 연주
+const TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+let lastTouch = null;
+renderer.domElement.addEventListener('touchstart', (e) => { const t = e.touches[0]; lastTouch = { x: t.clientX, y: t.clientY }; }, { passive: true });
+renderer.domElement.addEventListener('touchmove', (e) => {
+  const t = e.touches[0];
+  if (!lastTouch || S.vr) return;
+  yaw -= (t.clientX - lastTouch.x) * 0.005;
+  pitch = THREE.MathUtils.clamp(pitch - (t.clientY - lastTouch.y) * 0.005, -1.4, 1.4);
+  lastTouch = { x: t.clientX, y: t.clientY };
+}, { passive: true });
+$('#strumBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); strum(); });
 document.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== renderer.domElement) return;
   yaw -= e.movementX * 0.0022;
@@ -1042,7 +1064,8 @@ function step(dt, cam) {
   if (S.venue.instB) S.venue.instB.update();
   S.venue.theme.update(dt, now);
   if (S.inst) S.inst.update(dt);
-  $('#skipBtn').hidden = !['backstage', 'perform', 'encore'].includes(S.phase);
+  $('#skipBtn').hidden = !['backstage', 'call', 'perform', 'encore'].includes(S.phase);
+  $('#strumBtn').hidden = !(TOUCH && !S.vr && ['backstage', 'hush', 'perform', 'encore'].includes(S.phase));
 
   // 눈부심: 조명을 바라볼수록 강해짐
   if (S.venue.spot.intensity > 0) {

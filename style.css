@@ -133,6 +133,8 @@ details.exp summary { font-weight: 700; font-size: 14px; color: var(--accent); c
 #subtitle[hidden] { display: none; }
 #skipBtn { position: fixed; right: 16px; top: 16px; z-index: 5; background: rgba(255,255,255,0.92); }
 #skipBtn[hidden] { display: none; }
+#strumBtn { position: fixed; right: 20px; bottom: 90px; width: 96px; height: 96px; border-radius: 50%; z-index: 5; background: rgba(15,118,110,0.9); color: #fff; border: none; font-size: 18px; font-weight: 700; touch-action: manipulation; }
+#strumBtn[hidden] { display: none; }
 #sudsBox { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); display: flex; gap: 6px; z-index: 6; flex-wrap: wrap; justify-content: center; }
 #sudsBox button { width: 48px; padding: 10px 0; font-weight: 700; }
 #sudsBox[hidden] { display: none; }

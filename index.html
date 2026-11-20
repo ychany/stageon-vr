@@ -128,7 +128,8 @@
 
       <div class="panel keys">
         <h3>조작</h3>
-        <p class="note"><b>VR</b> 헤드셋을 쓴 자리가 대기실이고, 정면으로 약 2.2m 걸어 나가면 무대 중앙입니다. 앞쪽 공간을 비워 두세요.</p>
+        <p class="note"><b>VR</b> 헤드셋을 쓴 자리가 대기실이고, 정면으로 약 2.2m 걸어 나가면 무대 중앙입니다. 공간이 좁으면 호명된 뒤 B 버튼으로 바로 이동합니다.</p>
+        <p class="note"><b>휴대폰</b> 화면을 끌어서 둘러보기 · 오른쪽 아래 연주 버튼 · 건너뛰기 버튼으로 진행</p>
         <p class="note"><b>PC</b> 화면 클릭 후 마우스로 보기 · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>Space</kbd> 연주 · <kbd>N</kbd> 건너뛰기 · <kbd>M</kbd> 실수 · <kbd>↑</kbd><kbd>↓</kbd> 심박 · <kbd>0–9</kbd> 불안 점수 · <kbd>G</kbd> 상세 · <kbd>Q</kbd> 비상 정지</p>
       </div>
     </aside>
@@ -137,6 +138,7 @@
 
 <div id="subtitle" hidden></div>
 <button id="skipBtn" type="button" hidden>건너뛰기 ▶</button>
+<button id="strumBtn" type="button" hidden>연주</button>
 <div id="hud" hidden>
   <div id="hudText"></div>
   <div id="hudSub"></div>
@@ -207,6 +209,6 @@
   window.addEventListener('unhandledrejection', function (e) { stageonError(String(e.reason && e.reason.message || e.reason)); });
   setTimeout(function () { if (!document.querySelector('input[name=scenario]')) stageonError('시나리오 목록을 불러오지 못했습니다'); }, 4000);
 </script>
-<script type="module" src="src/main.js?v=202611210219"></script>
+<script type="module" src="src/main.js?v=202611210226"></script>
 </body>
 </html>
