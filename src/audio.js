@@ -239,9 +239,12 @@ export class AudioEngine {
   }
 
   // ---------- 반주 밴드 (멈출 수 없는 공연: E4) ----------
-  startBand({ bpm, bars, countIn, onBeat, onEnd, drummerPos, bassPos }) {
+  // track: { buffer, offset } 이면 합성 반주 대신 내 곡을 재생한다 (카운트인 스틱은 그대로).
+  // startBar: 곡의 몇 번째 마디부터 (심사위원이 끊은 뒤 다시 시작할 때)
+  startBand({ bpm, bars, countIn, onBeat, onEnd, drummerPos, bassPos, track = null, startBar = 0 }) {
     const ctx = this.ctx;
     clearInterval(this._bandTimer);
+    if (this._trackSrc) { try { this._trackSrc.stop(); } catch { /* 이미 멈춤 */ } this._trackSrc = null; }
     this._bandId = (this._bandId || 0) + 1;
     const myId = this._bandId;
     this.beatSec = 60 / bpm;
@@ -256,6 +259,20 @@ export class AudioEngine {
     this.bandBus.disconnect(); // 모니터 볼륨 사고(E4)를 위해 한 단계 더
     this.bandBus.connect(this.monitor).connect(this.master);
     const wet = ctx.createGain(); wet.gain.value = 0.5; this.monitor.connect(wet).connect(this.reverb);
+    if (track) {
+      // 무대 양옆 스피커(드럼·베이스 자리)에서 왼쪽·오른쪽 채널을 낸다
+      const src = ctx.createBufferSource();
+      src.buffer = track.buffer;
+      const split = ctx.createChannelSplitter(2);
+      const gl = ctx.createGain(), gr = ctx.createGain();
+      gl.gain.value = gr.gain.value = 1.3;
+      src.connect(split);
+      split.connect(gl, 0); split.connect(gr, track.buffer.numberOfChannels > 1 ? 1 : 0);
+      gl.connect(this.bassPan); gr.connect(this.drumPan);
+      src.start(this.gridStart, track.offset + startBar * 4 * this.beatSec);
+      src.stop(this.gridStart + bars * 4 * this.beatSec + 0.05);
+      this._trackSrc = src;
+    }
 
     let next = 0;
     const roots = [40, 40, 45, 43]; // E, E, A, G (베이스 MIDI)
@@ -263,7 +280,7 @@ export class AudioEngine {
       while (next < this.totalBeats && this.bandStart + next * this.beatSec < ctx.currentTime + 0.25) {
         const w = this.bandStart + next * this.beatSec;
         if (next < countIn) this._stick(w);
-        else {
+        else if (!track) {
           const b = next - countIn, inBar = b % 4, bar = Math.floor(b / 4);
           if (inBar === 0 || inBar === 2) this._kick(w);
           if (inBar === 1 || inBar === 3) this._snare(w);
@@ -286,6 +303,7 @@ export class AudioEngine {
 
   stopBand() {
     clearInterval(this._bandTimer);
+    if (this._trackSrc) { try { this._trackSrc.stop(this.ctx.currentTime + 0.1); } catch { /* 이미 멈춤 */ } this._trackSrc = null; }
     this._bandId = (this._bandId || 0) + 1;   // 예약된 종료 콜백 무효화
     if (this.monitor) this.monitor.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05);
   }

@@ -98,3 +98,59 @@ test('반응 지연은 0.3–1.5초, 앞줄이 더 빠름', () => {
   }
   assert.ok(reactionDelay(0, 0.5, TUNING) < reactionDelay(6, 0.5, TUNING));
 });
+
+// ---------- 추가: 관객 행동 · 다음 단계 추천 · CSV · 빠르기 추정 ----------
+import { pickBehavior, behaviorGap, recommendNext, toCSV } from '../src/director.js';
+import { estimateTempo } from '../src/tempo.js';
+import { BEHAVIORS } from '../src/config.js';
+
+test('관객 행동: 꺼진 행동은 고르지 않고, 가중치대로 고른다', () => {
+  const w = { film: 1, whisper: 3 };
+  assert.equal(pickBehavior(w, new Set(['whisper'])), 'whisper');
+  assert.equal(pickBehavior(w, new Set()), null);
+  assert.equal(pickBehavior(w, new Set(['film', 'whisper']), 0.1), 'film');
+  assert.equal(pickBehavior(w, new Set(['film', 'whisper']), 0.9), 'whisper');
+  for (const L of Object.values(LEVELS)) for (const k of Object.keys(L.behaviors.weights)) assert.ok(BEHAVIORS[k], k);
+});
+
+test('관객 행동 간격: 강도가 오르면 잦아지고 완화 모드면 드물어진다', () => {
+  assert.equal(behaviorGap(0), Infinity);
+  assert.ok(behaviorGap(3, 2, false, 0.5) < behaviorGap(3, 0, false, 0.5));
+  assert.ok(behaviorGap(3, 0, true, 0.5) > behaviorGap(3, 0, false, 0.5));
+});
+
+test('다음 단계 추천: 과부하면 내리고, 익숙해지면 올리고, 아니면 반복', () => {
+  const down = recommendNext({ level: 3, meanRatio: 0.55, peakRatio: 0.7, suds: 9 }, TUNING);
+  assert.equal(down.action, 'down'); assert.equal(down.level, 2); assert.ok(down.helper);
+  const up = recommendNext({ level: 2, meanRatio: 0.1, peakRatio: 0.2, suds: 2 }, TUNING);
+  assert.equal(up.action, 'up'); assert.equal(up.level, 3);
+  const hab = recommendNext({ level: 3, meanRatio: 0.3, peakRatio: 0.4, suds: 5, prevSuds: 7 }, TUNING);
+  assert.equal(hab.action, 'up');
+  const stay = recommendNext({ level: 3, meanRatio: 0.3, peakRatio: 0.4, suds: 6, prevSuds: 7 }, TUNING);
+  assert.equal(stay.action, 'stay'); assert.equal(stay.level, 3);
+  assert.equal(recommendNext({ level: 5, meanRatio: 0.1, peakRatio: 0.2, suds: 2 }, TUNING).action, 'real');
+  assert.equal(recommendNext({ level: 1, meanRatio: 0.6, peakRatio: 0.6, suds: 9 }, TUNING).level, 1);
+});
+
+test('CSV: BOM, 머리줄, 쉼표·따옴표 처리', () => {
+  const csv = toCSV([{ a: 1.23456, b: 'x,y' }, { a: NaN, b: '"q"' }], [{ key: 'a', label: '값' }, { key: 'b' }]);
+  assert.ok(csv.startsWith('﻿값,b\r\n'));
+  assert.ok(csv.includes('1.235,"x,y"'));
+  assert.ok(csv.includes(',"""q"""'));
+});
+
+test('빠르기 추정: 합성 클릭 트랙의 BPM과 첫 박', () => {
+  const sr = 22050;
+  for (const bpm of [92, 120, 140]) {
+    const sec = 20, offset = 0.73, x = new Float32Array(sr * sec);
+    for (let t = offset; t < sec; t += 60 / bpm) {
+      const i0 = Math.round(t * sr);
+      for (let j = 0; j < 400 && i0 + j < x.length; j++) x[i0 + j] += Math.sin(j * 0.3) * Math.exp(-j / 80);
+    }
+    for (let i = 0; i < x.length; i++) x[i] += (Math.random() - 0.5) * 0.01;
+    const r = estimateTempo(x, sr);
+    assert.ok(Math.abs(r.bpm - bpm) < 1.5, `${bpm} → ${r.bpm}`);
+    const beat = 60 / bpm, d = ((r.offset - offset) % beat + beat) % beat;
+    assert.ok(Math.min(d, beat - d) < 0.03, `offset ${r.offset}`);
+  }
+});

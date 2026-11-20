@@ -68,3 +68,28 @@ details.exp label { display: block; padding: 5px 0; font-size: 15px; }
 #replayBar[hidden] { display: none; }
 #replayFlag { color: var(--gold); min-width: 40px; }
 #replayBar button { white-space: nowrap; padding: 8px 14px; }
+
+.banner { background: var(--soft); border-left: 4px solid var(--purple); padding: 10px 12px; border-radius: 8px; font-size: 15px; margin: 8px 0; }
+.banner[hidden], #trackBox[hidden], #trackTempo[hidden] { display: none; }
+#ladder { display: flex; gap: 6px; flex-wrap: wrap; }
+#ladder .step { flex: 1 1 110px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 13px; color: var(--text); background: #fff; }
+#ladder .step b { display: block; color: var(--navy); font-size: 14px; }
+#ladder .step.done { background: #EAF7EE; border-color: #9BD3AA; }
+#ladder .step.next { border: 2px solid var(--purple); }
+#behaviors label { padding: 4px 0; }
+#behaviors .why { color: #8A86A6; font-size: 13px; margin-left: 6px; }
+select { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); margin-left: 6px; }
+.qr { margin: 0 0 24px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.qr canvas { width: 120px; height: 120px; image-rendering: pixelated; }
+.qr code { font-size: 13px; word-break: break-all; }
+#insight { max-width: 1100px; width: 100%; margin-top: 10px; font-size: 14px; color: var(--navy); display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+#insight .box { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+#insight .box b { color: var(--purple); }
+#insight ul { margin: 6px 0; padding-left: 18px; }
+#insight button { margin-top: 6px; padding: 8px 14px; }
+@media (max-width: 760px) { #insight { grid-template-columns: 1fr; } }
+#demoBadge { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); background: var(--purple); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 700; z-index: 6; }
+#demoBadge[hidden], #checkBox[hidden] { display: none; }
+#checkBox { position: fixed; left: 16px; top: 16px; background: rgba(10,10,20,0.85); color: #f4f2fb; padding: 12px 16px; border-radius: 12px; z-index: 6; max-width: min(560px, calc(100vw - 32px)); }
+#checkBox pre { margin: 0 0 8px; font: 14px/1.6 ui-monospace, monospace; white-space: pre-wrap; }
+#checkBox button { padding: 8px 12px; }

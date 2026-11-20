@@ -17,6 +17,7 @@ export const LEVELS = {
     heartbeat: false,        // E5 심박 되비추기
     timePressure: false,     // E4 시간 압박 큐
     eventsPerSong: 0,        // E4 예측 불가 사건
+    behaviors: { perMin: 1, stern: 0, weights: { whisper: 1, scroll: 1 } },
     backstageSec: 20,
   },
   2: {
@@ -34,6 +35,7 @@ export const LEVELS = {
     heartbeat: false,
     timePressure: false,
     eventsPerSong: 0,
+    behaviors: { perMin: 2, stern: 0, weights: { scroll: 3, whisper: 2, leave: 1, cough: 1 } },
     backstageSec: 30,
   },
   3: {
@@ -51,6 +53,7 @@ export const LEVELS = {
     heartbeat: true,
     timePressure: true,
     eventsPerSong: 1,
+    behaviors: { perMin: 3, stern: 2, weights: { film: 2, whisper: 2, scroll: 1, leave: 1, cough: 1 } },
     backstageSec: 40,
   },
   4: {
@@ -68,6 +71,7 @@ export const LEVELS = {
     heartbeat: true,
     timePressure: true,
     eventsPerSong: 1,
+    behaviors: { perMin: 3, stern: 3, weights: { whisper: 2, stern: 2, cough: 1, film: 1 } },
     backstageSec: 45,
   },
   5: {
@@ -85,9 +89,23 @@ export const LEVELS = {
     heartbeat: true,
     timePressure: true,
     eventsPerSong: 3,
+    behaviors: { perMin: 4, stern: 2, weights: { film: 3, whisper: 1, scroll: 1, leave: 1, cough: 1 } },
     backstageSec: 45,
   },
 };
+
+// 관객 행동 (교수님 피드백: 관객이 '어떻게' 불안을 만드는지 구체화)
+// cue: 실험에서 이 단서를 끄면 함께 꺼지는 범주 (E1 시선 · E2 평가 · E3 실수 반응 · E4 사건)
+export const BEHAVIORS = {
+  film:    { label: '휴대폰을 들어 나를 촬영', why: '기록으로 남는다 → 평가 불안', cue: 'eval' },
+  stern:   { label: '팔짱 끼고 무표정으로 지켜봄', why: '판단당하는 느낌 → 평가 불안', cue: 'eval' },
+  whisper: { label: '옆 사람과 손으로 입 가리고 수군거림', why: '내 얘기 같다 → 부정적 해석', cue: 'mistake' },
+  scroll:  { label: '휴대폰만 보는 딴짓', why: '지루한가? → 무관심에 대한 불안', cue: 'gaze' },
+  leave:   { label: '공연 중에 자리를 뜸', why: '내가 별로라서? → 거절감', cue: 'events' },
+  cough:   { label: '헛기침·기침', why: '정적을 깨는 소리 → 놀람', cue: 'events' },
+};
+// 시선 강도: 응시 비율에 곱하는 값 (강하게 = 눈을 돌리지 않고 계속 응시)
+export const GAZE_SCALE = { low: 0.5, normal: 1, high: 1.45 };
 
 // 보고서 4-2 / 4-3 / 4-6 수치
 export const TUNING = {
@@ -145,6 +163,7 @@ export const SCENARIOS = [
       { at: 4, who: 'friend', text: '야, 우리 다 왔어. 천천히 나와.' },
     ],
     call: (name) => `${name}, 이제 해 봐!`,
+    callWho: 'friend',
     script: [
       { bar: 4, do: 'say', who: 'friend', text: '오, 좋은데?' },
       { bar: 10, do: 'clapAlong', bars: 2 },
@@ -206,6 +225,7 @@ export const SCENARIOS = [
       { at: 14, who: 'staff', text: '다음 수험번호 십칠 번, 준비해 주세요.' },
     ],
     call: () => '수험번호 십칠 번, 들어오세요.',
+    callWho: 'staff',
     preSay: { who: 'judge', text: '준비되면 시작하세요.' },
     script: [
       { bar: 9, do: 'judgeStop', restartBars: 8, text: '네, 잠깐만요. 이 부분 다시 한 번 해 볼게요.' },

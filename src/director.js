@@ -171,3 +171,65 @@ export function reactionDelay(row, rand, tuning) {
   const randPart = rand * 0.4;
   return tuning.reactionDelayMin + span * Math.min(1, rowPart + randPart);
 }
+
+// ---------- 관객 행동 고르기 ----------
+// weights: { film: 2, whisper: 1, ... }, enabled: 켜진 행동 이름 Set, r: 0–1 난수
+export function pickBehavior(weights, enabled, r = Math.random()) {
+  const list = Object.entries(weights).filter(([k, w]) => w > 0 && enabled.has(k));
+  const total = list.reduce((a, [, w]) => a + w, 0);
+  if (!total) return null;
+  let x = r * total;
+  for (const [k, w] of list) { if (x < w) return k; x -= w; }
+  return list[list.length - 1][0];
+}
+// 다음 관객 행동까지의 간격(초): 단계의 분당 횟수 × 조절 엔진 강도, 완화 모드면 절반
+export function behaviorGap(perMin, intensity = 0, calm = false, r = Math.random()) {
+  if (!perMin) return Infinity;
+  const rate = perMin * (1 + 0.25 * intensity) * (calm ? 0.5 : 1);
+  return (60 / rate) * (0.5 + r);
+}
+
+// ---------- 단계별 노출 훈련: 다음 회차 추천 ----------
+// 노출 치료의 원칙: 불안이 충분히 내려갈 때까지 같은 단계를 반복하고(습관화), 내려가면 한 단계 올린다.
+// 견디기 힘든 수준이면 한 단계 내린다.
+export function recommendNext({ level, meanRatio, peakRatio, suds, prevSuds = null, maxLevel = 5 }, T) {
+  const reasons = [];
+  const r = Number.isFinite(meanRatio) ? meanRatio : null;
+  const s = Number.isFinite(suds) ? suds : null;
+  if ((s !== null && s >= T.sudsOverload) || (r !== null && r >= T.overloadRatio && peakRatio >= T.overloadRatio)) {
+    if (s !== null && s >= T.sudsOverload) reasons.push(`불안 점수 ${s}점 (견디기 힘든 수준 ${T.sudsOverload}점 이상)`);
+    if (r !== null && r >= T.overloadRatio) reasons.push(`연주 중 평균 심박 +${Math.round(r * 100)}% (과부하 +${Math.round(T.overloadRatio * 100)}% 이상)`);
+    const next = Math.max(1, level - 1);
+    reasons.push(next < level ? '한 단계 낮춰 성공 경험을 먼저 쌓고, 회복 도우미를 켜 보세요.' : '가장 낮은 단계입니다. 회복 도우미를 켜고 다시 해 보세요.');
+    return { action: next < level ? 'down' : 'stay', level: next, helper: true, reasons };
+  }
+  const habituated = s !== null && prevSuds !== null && prevSuds - s >= 2;
+  const easy = s !== null && s <= 3 && (r === null || r < T.targetLow);
+  if ((easy || (habituated && s <= 5)) && level < maxLevel) {
+    if (easy) reasons.push(`불안 점수 ${s}점, 심박 ${r === null ? '기록 없음' : `+${Math.round(r * 100)}%`} — 이 단계는 충분히 익숙해졌습니다.`);
+    if (habituated) reasons.push(`지난 회차 ${prevSuds}점 → 이번 ${s}점으로 2점 이상 줄었습니다 (습관화).`);
+    reasons.push('한 단계 올려 새로운 관객 앞에 서 보세요.');
+    return { action: 'up', level: level + 1, helper: false, reasons };
+  }
+  if ((easy || habituated) && level >= maxLevel) {
+    reasons.push('가장 높은 단계까지 익숙해졌습니다. 이제 실제 무대(측정 전용: 실제 관객 앞)에 도전해 보세요.');
+    return { action: 'real', level, helper: false, reasons };
+  }
+  if (s !== null) reasons.push(`불안 점수 ${s}점${prevSuds !== null ? ` (지난 회차 ${prevSuds}점)` : ''}`);
+  if (r !== null) reasons.push(`연주 중 평균 심박 ${r >= 0 ? '+' : ''}${Math.round(r * 100)}%`);
+  reasons.push('불안이 2점 이상 줄어들 때까지 같은 단계를 반복하세요 (습관화).');
+  return { action: 'stay', level, helper: false, reasons };
+}
+
+// ---------- CSV ----------
+// 엑셀에서 한글이 깨지지 않도록 BOM을 붙이고, 쉼표·따옴표·줄바꿈이 있는 값은 따옴표로 감싼다
+export function toCSV(rows, columns) {
+  const esc = (v) => {
+    if (v === null || v === undefined || (typeof v === 'number' && !Number.isFinite(v))) return '';
+    const s = typeof v === 'number' ? String(Math.round(v * 1000) / 1000) : typeof v === 'object' ? JSON.stringify(v) : String(v);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const head = columns.map((c) => esc(c.label || c.key)).join(',');
+  const body = rows.map((r) => columns.map((c) => esc(typeof c.get === 'function' ? c.get(r) : r[c.key])).join(','));
+  return '﻿' + [head, ...body].join('\r\n') + '\r\n';
+}

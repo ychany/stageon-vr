@@ -157,29 +157,48 @@ export class Person {
     this.bob = Math.random() * 10;
     this.neighbor = null;
     this.phone = null;
+    this.phoneMode = null;
+    this.crossed = false;     // 팔짱
+    this.stern = false;       // 무표정·차가운 얼굴 (평가하는 눈빛)
     this.time = 0;
   }
 
-  addPhone() {
-    if (this.phone || this.tier !== 'A') return;
+  // mode 'film': 나를 향해 들고 촬영(빨간 녹화 표시) · 'scroll': 무릎 높이에서 화면만 봄(딴짓, 얼굴에 화면 빛)
+  addPhone(mode = 'film') {
+    if (this.tier !== 'A') return;
+    if (this.phone && this.phoneMode === mode) return;
+    if (this.phone) this.removePhone();
     const g = new THREE.Group();
     g.add(new THREE.Mesh(G.phone, new THREE.MeshLambertMaterial({ color: 0x111111 })));
-    const led = new THREE.Mesh(new THREE.SphereGeometry(0.008, 6, 4), new THREE.MeshBasicMaterial({ color: 0xff2020 }));
-    led.position.set(0.02, 0.05, 0.007);
-    g.add(led);
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xff3030, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
-    glow.scale.set(0.06, 0.06, 1); glow.position.copy(led.position);
-    g.add(glow);
-    g.position.set(0.12, this.seated ? 1.05 : 1.42, 0.32);
+    if (mode === 'film') {
+      const led = new THREE.Mesh(new THREE.SphereGeometry(0.008, 6, 4), new THREE.MeshBasicMaterial({ color: 0xff2020 }));
+      led.position.set(0.02, 0.05, 0.007);
+      g.add(led);
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xff3030, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+      glow.scale.set(0.06, 0.06, 1); glow.position.copy(led.position);
+      g.add(glow);
+      g.position.set(0.12, this.seated ? 1.05 : 1.42, 0.32);
+      if (this.arms) this.arms[1].rotation.x = -1.25;
+    } else {
+      // 화면이 위를 향하고, 푸른 빛이 얼굴을 비춘다
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.12), new THREE.MeshBasicMaterial({ color: 0x9ec8ff }));
+      screen.position.z = 0.006; g.add(screen);
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x6aa8ff, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+      glow.scale.set(0.3, 0.3, 1); glow.position.z = 0.03; g.add(glow);
+      g.position.set(0.04, this.seated ? 0.78 : 1.12, 0.3);
+      g.rotation.x = -1.0;
+      if (this.arms) { this.arms[0].rotation.set(-0.9, 0, 0.35); this.arms[1].rotation.set(-0.9, 0, -0.35); }
+    }
     this.body.add(g);
     this.phone = g;
-    if (this.arms) { this.arms[1].rotation.x = -1.25; }
+    this.phoneMode = mode;
   }
   removePhone() {
     if (!this.phone) return;
     this.body.remove(this.phone);
     this.phone = null;
-    if (this.arms) this.arms[1].rotation.x = 0;
+    this.phoneMode = null;
+    if (this.arms) { this.arms[0].rotation.set(0, 0, 0); this.arms[1].rotation.set(0, 0, 0); }
   }
 
   // when: 지금부터 몇 초 뒤
@@ -212,7 +231,8 @@ export class Person {
     const p = ctx.params;
     let lean = 0;
     if (now < this.eyeContactUntil) target = userHead;
-    else if (this.state === 'murmur' && this.neighbor) target = this.neighbor.headWorld(ctx.tmp2);
+    else if ((this.state === 'murmur' || this.state === 'whisper') && this.neighbor) target = this.neighbor.headWorld(ctx.tmp2);
+    else if (this.state === 'whisperBack') target = (now % 1.6 < 0.9 || !this.neighbor) ? userHead : this.neighbor.headWorld(ctx.tmp2);
     else if (this.state === 'write') target = ctx.tmp2.set(this.root.position.x + 0.1, this.root.position.y + 0.75, this.root.position.z + 0.4);
     else if (this.state === 'watch') target = ctx.tmp2.set(this.root.position.x - 0.35, this.root.position.y + 1.05, this.root.position.z + 0.35);
     else if (this.lookAt && now < this.lookAtUntil) target = this.lookAt;
@@ -229,6 +249,9 @@ export class Person {
       else target = ctx.idleTarget;
     }
     if (this.phone && !this.watcher && this.state === 'idle') target = null; // 휴대폰 화면을 봄
+    if (this.phoneMode === 'scroll' && this.state === 'idle' && now >= this.eyeContactUntil) target = null;
+    // 시선 강도 '강하게': 응시하는 관객은 눈을 돌리지 않는다
+    if (p.noGlance && this.watcher && target === this.glanceTarget) target = userHead;
 
     // 머리 방향 (yaw/pitch) 부드럽게
     let ty = 0, tp = -0.5, tr = 0;
@@ -244,6 +267,7 @@ export class Person {
     }
     if (lean) tr = 0.35 * Math.sign(this.root.position.x || 1);
     if (this.state === 'murmur') tr = 0.15;
+    if (this.state === 'whisper' && this.neighbor) tr = 0.28 * Math.sign(this.neighbor.root.position.x - this.root.position.x || 1);
     const k = Math.min(1, dt * 6);
     this.yaw += (ty - this.yaw) * k;
     this.pitch += (tp - this.pitch) * k;
@@ -258,7 +282,9 @@ export class Person {
       if (this.state === 'murmur') { brow = -1; smile = -0.3; }
       if (this.state === 'cheer') { brow = 0.4; smile = 1; }
       if (this.state === 'cold') { brow = -0.6; smile = -0.2; }
-      if (p.friendly && this.state === 'idle' && now >= this.eyeContactUntil) smile = 0.35;
+      if (this.stern && this.state === 'idle') { brow = -0.7; smile = -0.35; }
+      if (this.state === 'whisper' || this.state === 'whisperBack') { brow = -0.3; smile = 0.15; }   // 피식 웃으며 귓속말
+      if (p.friendly && !this.stern && this.state === 'idle' && now >= this.eyeContactUntil) smile = 0.35;
       this.exprNow.brow += (brow - this.exprNow.brow) * Math.min(1, dt * 8);
       this.exprNow.smile += (smile - this.exprNow.smile) * Math.min(1, dt * 8);
       this.brows.position.y = this.exprNow.brow * 0.012;
@@ -280,6 +306,17 @@ export class Person {
         this.arms[0].rotation.set(-1.2, 0, -0.5 + ph * 0.35);
         this.arms[1].rotation.set(-1.2, 0, 0.5 - ph * 0.35);
       }
+    } else if (this.arms && this.state === 'whisper') {
+      // 손으로 입을 가리고 옆 사람에게 속삭임
+      const s = Math.sign(this.neighbor ? this.neighbor.root.position.x - this.root.position.x : 1) || 1;
+      const arm = s > 0 ? this.arms[1] : this.arms[0];
+      arm.rotation.set(-2.2, 0, -0.6 * s);
+      (arm === this.arms[1] ? this.arms[0] : this.arms[1]).rotation.set(0, 0, 0);
+      this.body.position.y = 0;
+    } else if (this.arms && this.crossed && !this.phone) {
+      this.arms[0].rotation.set(-1.4, 0, 0.9);
+      this.arms[1].rotation.set(-1.32, 0, -0.9);
+      this.body.position.y = 0;
     } else if (this.arms && this.state === 'write') {
       this.arms[1].rotation.set(-0.95 + Math.sin(now * 14) * 0.08, 0, Math.sin(now * 9) * 0.1);
       this.arms[0].rotation.set(0, 0, 0);
@@ -289,7 +326,12 @@ export class Person {
       this.arms[0].rotation.set(0, 0, 0.04);
       this.arms[1].rotation.set(0, 0, -0.04);
       this.body.position.y = 0;
-    } else this.body.position.y = 0;
+    } else {
+      this.body.position.y = 0;
+      // 박수가 끝나면 휴대폰 든 자세로 되돌린다
+      if (this.arms && this.phoneMode === 'film') { this.arms[0].rotation.set(0, 0, 0.04); this.arms[1].rotation.set(-1.25, 0, 0); }
+      if (this.arms && this.phoneMode === 'scroll') { this.arms[0].rotation.set(-0.9, 0, 0.35); this.arms[1].rotation.set(-0.9, 0, -0.35); }
+    }
   }
 
   headWorld(out) {

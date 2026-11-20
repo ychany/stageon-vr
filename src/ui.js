@@ -1,7 +1,7 @@
 // 헤드셋 안의 안내 패널과 리포트 그래프
 import * as THREE from 'three';
-import { makeCanvasPanel } from './venue.js?v=202611202330';
-import { TUNING } from './config.js?v=202611202330';
+import { makeCanvasPanel } from './venue.js?v=202611210116';
+import { TUNING } from './config.js?v=202611210116';
 
 export class FloatingPanel {
   constructor(scene) {
@@ -14,7 +14,7 @@ export class FloatingPanel {
     this._target = new THREE.Vector3();
     this._q = new THREE.Quaternion();
   }
-  show(title, lines = [], { footer = '' } = {}) {
+  show(title, lines = [], { footer = '', small = false, keepPlace = false } = {}) {
     const { ctx, canvas } = this.p;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     roundRect(ctx, 8, 8, canvas.width - 16, canvas.height - 16, 36, 'rgba(20,18,40,0.88)');
@@ -22,17 +22,18 @@ export class FloatingPanel {
     ctx.font = '700 54px "Noto Sans KR", sans-serif';
     ctx.fillText(title, 60, 110);
     ctx.fillStyle = '#F4F2FB';
-    ctx.font = '400 40px "Noto Sans KR", sans-serif';
-    lines.forEach((l, i) => ctx.fillText(l, 60, 200 + i * 62));
+    ctx.font = small ? '400 27px "Noto Sans KR", sans-serif' : '400 40px "Noto Sans KR", sans-serif';
+    lines.forEach((l, i) => ctx.fillText(l, small ? 44 : 60, (small ? 180 : 200) + i * (small ? 46 : 62)));
     if (footer) {
       ctx.fillStyle = '#A8A3C8';
       ctx.font = '400 30px "Noto Sans KR", sans-serif';
       ctx.fillText(footer, 60, canvas.height - 50);
     }
     this.p.tex.needsUpdate = true;
+    const wasVisible = this.p.mesh.visible;
     this.p.mesh.visible = true;
     this.p.mesh.scale.set(1.2, 0.675, 1);
-    this._snap = true;
+    this._snap = !(keepPlace && wasVisible);
   }
   showCanvas(srcCanvas) {
     const { ctx, canvas } = this.p;
@@ -103,12 +104,27 @@ export function drawReport(canvas, data) {
     if (m < t0) continue;
     ctx.beginPath(); ctx.moveTo(xr(m), gy); ctx.lineTo(xr(m), gy + gh); ctx.stroke();
   }
+  // 관객 행동 시점: 그래프 위쪽에 보라색 점 (내가 본 행동은 채운 점)
+  const SHORT = { film: '촬영', stern: '팔짱', whisper: '수군', scroll: '딴짓', leave: '퇴장', cough: '기침' };
+  ctx.font = '400 15px "Noto Sans KR", sans-serif';
+  (data.behaviors || []).forEach((b, i) => {
+    if (b.t < t0 || b.t > t1) return;
+    const x = xr(b.t), y = gy + 14 + (i % 2) * 22;
+    ctx.strokeStyle = '#6C5CE7'; ctx.fillStyle = '#6C5CE7'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); b.seen ? ctx.fill() : ctx.stroke();
+    ctx.fillText(SHORT[b.type] || b.type, x + 9, y + 5);
+  });
   // 심박 곡선
   ctx.strokeStyle = '#1E1B3A'; ctx.lineWidth = 3; ctx.beginPath();
   pts.forEach((p, i) => { const x = xr(p.t), y = yr(p.ratio); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
   ctx.stroke();
   ctx.fillStyle = '#8A86A6';
-  ctx.fillText('심박 (기준선 대비)   │ 주황선 = 실수', gx, gy + gh + 34);
+  ctx.fillText('심박 (기준선 대비)   │ 주황선 = 실수   │ 보라 점 = 관객 행동 (채운 점은 내가 봄)', gx, gy + gh + 34);
+  if (data.next) {
+    const ACT = { up: '한 단계 올리기', down: '한 단계 내리기', stay: '같은 단계 반복', real: '실제 무대 도전' };
+    ctx.fillStyle = '#6C5CE7'; ctx.font = '700 19px "Noto Sans KR", sans-serif';
+    ctx.fillText(`다음 회차 추천: ${ACT[data.next.action]} → Lv${data.next.level}${data.next.helper ? ' · 회복 도우미 켜기' : ''}`, gx, H - 12);
+  }
 
   // 오른쪽 수치
   const rx = gx + gw + 60;

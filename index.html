@@ -20,6 +20,13 @@
       <input id="name" type="text" maxlength="20" placeholder="연주자">
     </label>
 
+    <fieldset id="ladderBox">
+      <legend>단계별 노출 훈련</legend>
+      <div id="ladder"></div>
+      <p id="nextBanner" class="banner" hidden></p>
+      <div class="row"><button id="historyCsv" type="button">전체 기록 CSV 저장</button><span id="historyCount" class="hint"></span></div>
+    </fieldset>
+
     <fieldset>
       <legend>모드</legend>
       <label><input type="radio" name="mode" value="vr" checked> <b>VR 무대 훈련</b> (실험 조건 B)</label>
@@ -36,6 +43,31 @@
       <legend>시나리오</legend>
       <div id="scenarios"></div>
       <p id="loadError" class="error" hidden></p>
+    </fieldset>
+
+    <fieldset>
+      <legend>관객 행동 (불안을 만드는 요소)</legend>
+      <p class="hint" style="margin:0 0 4px">켠 행동이 단계에 맞는 빈도로 공연 중에 일어납니다. 내가 그 장면을 봤는지도 기록합니다.</p>
+      <div id="behaviors"></div>
+      <label class="field" style="margin:8px 0 0">관객 시선 강도
+        <select id="gazeScale"><option value="low">약하게 (절반만 나를 봄)</option><option value="normal" selected>기본 (단계 설정대로)</option><option value="high">강하게 (모두 눈을 떼지 않고 응시)</option></select>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>반주</legend>
+      <label><input type="radio" name="track" value="band" checked> 기본 밴드 반주 (100 BPM)</label>
+      <label><input type="radio" name="track" value="file"> 내 곡으로 연주 (MP3·WAV 파일)</label>
+      <div id="trackBox" hidden>
+        <input id="trackFile" type="file" accept="audio/*">
+        <p id="trackStatus" class="hint" style="margin:6px 0"></p>
+        <div class="row" id="trackTempo" hidden>
+          <label style="padding:0">빠르기 <input id="trackBpm" type="number" min="40" max="240" step="0.1" style="width:90px"> BPM</label>
+          <button type="button" id="bpmHalf">÷2</button><button type="button" id="bpmDouble">×2</button>
+          <button type="button" id="trackPreview">박자 들어 보기</button>
+        </div>
+        <label><input id="trackFull" type="checkbox"> 곡 끝까지 연주 (끄면 시나리오 길이만큼)</label>
+      </div>
     </fieldset>
 
     <fieldset>
@@ -70,6 +102,12 @@
     <div class="row buttons">
       <button id="startVR" class="primary" type="button">VR로 시작</button>
       <button id="startDesktop" type="button">PC에서 시작</button>
+      <button id="startDemo" type="button">자동 시연 (발표용)</button>
+      <button id="startCheck" type="button">기기 점검</button>
+    </div>
+    <div class="qr row">
+      <canvas id="qr" width="160" height="160"></canvas>
+      <div><b>헤드셋에서 열기</b><br><span class="hint" style="margin:0">Quest 브라우저로 QR을 찍거나 주소를 입력하세요.</span><br><code id="qrUrl"></code></div>
     </div>
     <p class="hint">VR: 헤드셋을 쓴 자리가 대기실이고, 정면으로 약 2.2m 걸어 나가면 무대 중앙입니다. 앞쪽 공간을 비워 두세요.<br>
     PC: 화면 클릭 후 마우스로 보기, W/A/S/D 이동, Space 연주(박자에 맞춰), N 건너뛰기, M 실수, ↑/↓ 심박, 0–9 주관적 불안(SUDs), G 상세 정보, Q 비상 정지.</p>
@@ -87,11 +125,14 @@
 
 <div id="report" hidden>
   <canvas id="reportCanvas" width="1280" height="720"></canvas>
+  <div id="insight"></div>
   <div id="history"></div>
   <div class="row buttons">
     <button id="again" class="primary" type="button">다시 하기</button>
     <button id="replayBtn" type="button">관객 시점으로 다시 보기</button>
     <button id="download" type="button">데이터 저장 (JSON)</button>
+    <button id="csvSession" type="button">이번 회차 CSV</button>
+    <button id="csvHistory" type="button">전체 기록 CSV</button>
   </div>
 </div>
 
@@ -108,6 +149,8 @@
 </div>
 <div id="replayBar" hidden><span id="replayText"></span><b id="replayFlag"></b><button id="replayStop" type="button">리포트로</button></div>
 <div id="sudsBox" hidden></div>
+<div id="demoBadge" hidden>자동 시연 중 · 아무 키나 누르면 직접 조작</div>
+<div id="checkBox" hidden><pre id="checkText"></pre><div class="row"><button id="checkSave" type="button">점검 결과 저장</button><button type="button" onclick="location.reload()">처음으로</button></div></div>
 <div id="breath" hidden>들숨</div>
 <div id="stopped" hidden>
   <p>비상 정지되었습니다.</p>
@@ -124,6 +167,6 @@
   window.addEventListener('unhandledrejection', function (e) { stageonError(String(e.reason && e.reason.message || e.reason)); });
   setTimeout(function () { if (!document.querySelector('input[name=scenario]')) stageonError('시나리오 목록을 불러오지 못했습니다'); }, 4000);
 </script>
-<script type="module" src="src/main.js?v=202611202330"></script>
+<script type="module" src="src/main.js?v=202611210116"></script>
 </body>
 </html>
