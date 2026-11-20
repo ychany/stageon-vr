@@ -241,6 +241,9 @@ export class AudioEngine {
   // ---------- 반주 밴드 (멈출 수 없는 공연: E4) ----------
   startBand({ bpm, bars, countIn, onBeat, onEnd, drummerPos, bassPos }) {
     const ctx = this.ctx;
+    clearInterval(this._bandTimer);
+    this._bandId = (this._bandId || 0) + 1;
+    const myId = this._bandId;
     this.beatSec = 60 / bpm;
     this.bandStart = ctx.currentTime + 0.3;
     this.gridStart = this.bandStart + countIn * this.beatSec;   // 노래 첫 박
@@ -274,7 +277,7 @@ export class AudioEngine {
       if (next >= this.totalBeats) {
         clearInterval(this._bandTimer);
         const endAt = this.bandStart + this.totalBeats * this.beatSec;
-        setTimeout(() => onEnd && onEnd(), Math.max(0, (endAt - ctx.currentTime) * 1000) + 300);
+        setTimeout(() => { if (this._bandId === myId) onEnd && onEnd(); }, Math.max(0, (endAt - ctx.currentTime) * 1000) + 300);
       }
     };
     this._bandTimer = setInterval(sched, 25);
@@ -283,7 +286,42 @@ export class AudioEngine {
 
   stopBand() {
     clearInterval(this._bandTimer);
+    this._bandId = (this._bandId || 0) + 1;   // 예약된 종료 콜백 무효화
     if (this.monitor) this.monitor.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05);
+  }
+
+  // 솔로 구간: 반주가 한발 물러나 내 소리만 드러난다
+  setBandLevel(v, time = 0.3) {
+    if (this.monitor) this.monitor.gain.setTargetAtTime(v, this.ctx.currentTime, time / 3);
+  }
+
+  // 관객 박수 따라치기 (2·4박)
+  clapAlong(positions, when) {
+    for (let i = 0; i < Math.min(10, positions.length); i++) {
+      const p = positions[(i * 7) % positions.length];
+      this.clap(p, when + Math.random() * 0.03, 0.3);
+    }
+  }
+
+  // 함성 (“앵콜!”처럼 두 음절로 끊어지는 외침)
+  chant(positions, times = 6, gap = 0.75) {
+    const ctx = this.ctx, t0 = ctx.currentTime;
+    for (let k = 0; k < times; k++) {
+      for (let i = 0; i < Math.min(8, positions.length); i++) {
+        const pos = positions[(i * 5 + k) % positions.length];
+        for (const [off, f] of [[0, 520], [0.24, 430]]) {
+          const w = t0 + k * gap + off + Math.random() * 0.04;
+          const src = ctx.createBufferSource(); src.buffer = this.noise;
+          const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f + Math.random() * 80; bp.Q.value = 5;
+          const bp2 = ctx.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = f * 2.3; bp2.Q.value = 6;
+          const env = ctx.createGain(); env.gain.value = 0;
+          env.gain.setValueAtTime(0, w); env.gain.linearRampToValueAtTime(0.9, w + 0.03); env.gain.linearRampToValueAtTime(0, w + 0.2);
+          src.connect(bp).connect(env); src.connect(bp2).connect(env);
+          env.connect(this._clapPanner(pos));
+          src.start(w, Math.random()); src.stop(w + 0.25);
+        }
+      }
+    }
   }
 
   // E4 모니터 소리 작아짐: 아무 안내 없이 반주가 작아진다

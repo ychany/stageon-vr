@@ -115,7 +115,7 @@ export const TUNING = {
   sudsOverload: 8,
   // 공연
   bpm: 100,
-  songBars: 40,
+  songBars: 16,                              // 한 곡 약 40초 (시나리오마다 다름)
   countInBeats: 4,
   moodHoldSec: 5,                            // 분위기는 같은 상태 5초 이상일 때 전환
 };
@@ -128,3 +128,111 @@ export const STAGE = {
   backstageBackZ: 1.6,
   stageWidth: 7,
 };
+
+// ---------- 시나리오 ----------
+// 같은 단계라도 이야기가 있어야 불안이 생긴다 (몰입감 Plot).
+// script: 노래의 몇 번째 마디(bar, 0부터)에서 무슨 일이 일어나는지.
+// who: 'mc' 사회자 · 'staff' 무대 감독 · 'member' 밴드 멤버 · 'judge' 심사위원 · 'friend' 친구 · 'crowd' 관객
+export const SCENARIOS = [
+  {
+    id: 'friends',
+    level: 1,
+    title: '친구들 앞 첫 리허설',
+    story: ['다음 주 첫 공연을 앞두고', '친구 셋을 연습실에 불렀다.', '“편하게 해, 그냥 듣기만 할게.”'],
+    goal: '목표: 친구들과 눈 맞추며 끝까지 연주하기',
+    bars: 12,
+    backstage: [
+      { at: 4, who: 'friend', text: '야, 우리 다 왔어. 천천히 나와.' },
+    ],
+    call: (name) => `${name}, 이제 해 봐!`,
+    script: [
+      { bar: 4, do: 'say', who: 'friend', text: '오, 좋은데?' },
+      { bar: 10, do: 'clapAlong', bars: 2 },
+    ],
+    end: { who: 'friend', text: '야 진짜 잘한다. 실전도 이렇게만 해.' },
+    encore: false,
+  },
+  {
+    id: 'cafe',
+    level: 2,
+    title: '카페 오픈마이크',
+    story: ['동네 카페의 오픈마이크.', '손님들은 커피를 마시며 이야기 중이다.', '아무도 나를 기다리지 않는다.'],
+    goal: '목표: 관심 없는 관객 앞에서도 흔들리지 않기',
+    bars: 16,
+    backstage: [
+      { at: 5, who: 'staff', text: '다음 순서예요. 마이크 확인하고 나가시면 돼요.' },
+    ],
+    call: (name) => `다음은 오픈마이크 세 번째 순서, ${name} 님입니다.`,
+    script: [
+      { bar: 2, do: 'event', type: 'cough' },
+      { bar: 6, do: 'event', type: 'phoneRing' },
+      { bar: 9, do: 'say', who: 'crowd', text: '(웃음소리) …아 진짜? 그래서?' },
+      { bar: 12, do: 'attention' },
+    ],
+    end: { who: 'mc', text: '감사합니다. 따뜻한 박수 부탁드려요.' },
+    encore: false,
+  },
+  {
+    id: 'club',
+    level: 3,
+    title: '밴드 첫 클럽 공연',
+    story: ['처음으로 잡은 라이브 클럽 공연.', '객석은 꽉 찼고, 앞줄은 휴대폰을 들고 있다.', '중간에 내 솔로가 있다.'],
+    goal: '목표: 솔로에서 실수해도 멈추지 않고 이어가기',
+    bars: 18,
+    backstage: [
+      { at: 4, who: 'member', text: '긴장돼? 연습한 대로만 하자.' },
+      { at: 12, who: 'staff', text: '1분 뒤에 입장합니다.' },
+    ],
+    call: (name) => `오늘 첫 무대! ${name}와 밴드를 큰 박수로 맞아 주세요!`,
+    script: [
+      { bar: 0, do: 'say', who: 'member', text: '원, 투, 쓰리, 포!' },
+      { bar: 6, do: 'phonesUp' },
+      { bar: 8, do: 'solo', bars: 4, text: '솔로 간다!' },
+      { bar: 13, do: 'event', type: 'monitorDrop' },
+      { bar: 15, do: 'clapAlong', bars: 3 },
+    ],
+    end: { who: 'mc', text: '다 같이 박수!' },
+    encore: { bars: 8, text: '앵콜! 앵콜!' },
+  },
+  {
+    id: 'audition',
+    level: 4,
+    title: '대학 입시 실기',
+    story: ['실용음악과 입시 실기 시험장.', '심사위원 세 명이 무표정하게 앉아 있다.', '시험은 한 번뿐이다.'],
+    goal: '목표: 중간에 끊겨도 다시 집중해서 연주하기',
+    bars: 16,
+    backstage: [
+      { at: 3, who: 'staff', text: '휴대폰은 꺼 주시고, 호명되면 바로 입장합니다.' },
+      { at: 14, who: 'staff', text: '다음 수험번호 십칠 번, 준비해 주세요.' },
+    ],
+    call: () => '수험번호 십칠 번, 들어오세요.',
+    preSay: { who: 'judge', text: '준비되면 시작하세요.' },
+    script: [
+      { bar: 9, do: 'judgeStop', restartBars: 8, text: '네, 잠깐만요. 이 부분 다시 한 번 해 볼게요.' },
+    ],
+    end: { who: 'judge', text: '수고하셨습니다. 나가셔도 됩니다.' },
+    encore: false,
+  },
+  {
+    id: 'festival',
+    level: 5,
+    title: '여름 페스티벌 메인 무대',
+    story: ['오백 명이 모인 여름 페스티벌.', '앞 팀의 앵콜 함성이 아직 남아 있다.', '무대에서는 무슨 일이든 생긴다.'],
+    goal: '목표: 예상 못 한 사고에도 공연을 끝까지 이끌기',
+    bars: 20,
+    backstage: [
+      { at: 4, who: 'staff', text: '앞 팀 끝났습니다. 장비 세팅 들어갑니다.' },
+      { at: 14, who: 'member', text: '사람 진짜 많다… 우리 할 수 있어.' },
+    ],
+    call: (name) => `여러분 소리 질러! 다음 무대, ${name}!`,
+    script: [
+      { bar: 0, do: 'say', who: 'member', text: '갑니다!' },
+      { bar: 5, do: 'event', type: 'monitorDrop' },
+      { bar: 9, do: 'solo', bars: 4, text: '솔로!' },
+      { bar: 14, do: 'event', type: 'flicker' },
+      { bar: 16, do: 'clapAlong', bars: 4 },
+    ],
+    end: { who: 'mc', text: '대박! 다시 한 번 큰 박수!' },
+    encore: { bars: 8, text: '앵콜! 앵콜!' },
+  },
+];

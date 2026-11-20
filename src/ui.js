@@ -74,14 +74,14 @@ export function drawReport(canvas, data) {
   ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#1E1B3A';
   ctx.font = '700 40px "Noto Sans KR", sans-serif';
-  ctx.fillText(`공연 리포트 · Lv${data.level} ${data.levelName}`, 40, 60);
+  ctx.fillText(`공연 리포트 · ${data.scenario || ''}`, 40, 60);
   ctx.font = '400 22px "Noto Sans KR", sans-serif';
   ctx.fillStyle = '#6E6A8C';
-  ctx.fillText(`${data.hrSource}${data.mic ? ' · 악기 입력 사용' : ' · 실수는 수동 입력'}`, 40, 92);
+  ctx.fillText(`Lv${data.level} ${data.levelName}${data.encore ? ' · 앵콜 받음' : ''} · ${data.hrSource}${data.mic ? ' · 악기 입력 사용' : ' · 실수는 수동 입력'}`, 40, 92);
 
   // 그래프 영역
   const gx = 60, gy = 120, gw = W * 0.62, gh = H - 190;
-  const pts = data.hr.filter((p) => p.phase === 'perform' || p.phase === 'hush' || p.phase === 'call');
+  const pts = data.hr.filter((p) => ['call', 'hush', 'perform', 'encore'].includes(p.phase));
   const t0 = pts.length ? pts[0].t : 0, t1 = pts.length ? pts[pts.length - 1].t : 1;
   const xr = (t) => gx + ((t - t0) / Math.max(1, t1 - t0)) * gw;
   const ymin = -0.2, ymax = 0.8;

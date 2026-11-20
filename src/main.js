@@ -1,6 +1,6 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE } from './config.js';
+import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js';
 import { buildVenue } from './venue.js';
 import { AudioEngine } from './audio.js';
 import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js';
@@ -12,7 +12,11 @@ import { Person, rand } from './figures.js';
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
 const FAST = new URLSearchParams(location.search).has('fast');
-if (FAST) { TUNING.songBars = 8; Object.values(LEVELS).forEach((l) => { l.backstageSec = 6; }); }
+if (FAST) {
+  Object.values(LEVELS).forEach((l) => { l.backstageSec = 6; });
+  SCENARIOS.forEach((sc) => { sc.bars = Math.min(sc.bars, 12); sc.backstage.forEach((b) => { b.at = Math.min(b.at * 0.3, 5); }); if (sc.encore) sc.encore.bars = 4; });
+}
+const WHO = { mc: '사회자', staff: '무대 감독', member: '드러머', judge: '심사위원', friend: '친구', crowd: '관객' };
 
 // ---------- 렌더러 ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -36,6 +40,35 @@ window.addEventListener('resize', () => {
 });
 
 const audio = new AudioEngine();
+const subtitle = makeSubtitle();
+camera.add(subtitle.mesh);
+function makeSubtitle() {
+  const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 160;
+  const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.14), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false }));
+  mesh.position.set(0, -0.32, -1.1); mesh.renderOrder = 20; mesh.visible = false;
+  return { canvas, ctx: canvas.getContext('2d'), tex, mesh, until: 0 };
+}
+// 사회자·무대 감독·멤버의 말: 음성 + 자막 (Quest 브라우저에 한국어 음성이 없을 수 있어 자막을 함께 띄운다)
+function speak(who, text, sec = 3.5) {
+  audio.say(text);
+  const { ctx, canvas, tex, mesh } = subtitle;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(10,10,20,0.72)';
+  ctx.fillRect(0, 20, canvas.width, 120);
+  ctx.font = '700 40px "Noto Sans KR", sans-serif'; ctx.fillStyle = '#F2B544';
+  const label = WHO[who] || who;
+  ctx.fillText(label, 30, 96);
+  const lw = ctx.measureText(label).width;
+  ctx.font = '400 40px "Noto Sans KR", sans-serif'; ctx.fillStyle = '#ffffff';
+  ctx.fillText(text, 30 + lw + 24, 96);
+  tex.needsUpdate = true;
+  mesh.visible = S.vr;          // PC에서는 화면 아래 글자 자막만 쓴다
+  subtitle.until = S.t + sec;
+  $('#subtitle').innerHTML = `<b>${label}</b> ${text}`;
+  $('#subtitle').hidden = false;
+  log(`${label}: ${text}`);
+}
 const panel = new FloatingPanel(scene);
 const clock = new THREE.Clock();
 
@@ -53,6 +86,10 @@ const S = {
 const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), userHead = new THREE.Vector3();
 
 // ---------- 시작 화면 ----------
+$('#scenarios').innerHTML = SCENARIOS.map((sc, i) => `
+  <label class="scenario"><input type="radio" name="scenario" value="${i}" ${i === 2 ? 'checked' : ''}>
+    <span><b>${sc.title}</b> <span class="lv">Lv${sc.level} ${LEVELS[sc.level].name}</span><br>
+    <span class="story">${sc.story.join(' ')}</span></span></label>`).join('');
 let photoTexture = null;
 $('#photo').addEventListener('change', (e) => {
   const f = e.target.files[0];
@@ -86,7 +123,9 @@ $('#startDesktop').addEventListener('click', () => begin(false));
 $('#startVR').addEventListener('click', () => begin(true));
 
 async function begin(vr) {
-  const level = LEVELS[Number($('input[name=level]:checked').value)];
+  const sc = SCENARIOS[Number($('input[name=scenario]:checked').value)];
+  const level = LEVELS[sc.level];
+  S.sc = sc;
   S.name = $('#name').value.trim() || '연주자';
   S.level = level;
   S.vr = vr;
@@ -139,17 +178,18 @@ function setPhase(ph) {
   const L = S.level;
   if (ph === 'backstage') {
     audio.setCrowdLevel(0.4, 2);
-    panel.show('대기실', [
-      `Lv${L.id} ${L.name} · ${L.desc}`,
-      '곧 무대에 오릅니다. 악기를 준비하고 기다리세요.',
-      '정면 커튼 너머가 무대입니다.',
-    ], { footer: S.vr ? '비상 정지: 왼손 X 버튼' : '비상 정지: Q · 실수 입력: M · 심박 조절: ↑/↓' });
-    if (L.timePressure) setTimeout(() => S.phase === 'backstage' && cue('5분 전입니다. 준비해 주세요.'), 3000);
+    panel.show(S.sc.title, [
+      ...S.sc.story,
+      S.sc.goal,
+      '정면 커튼 너머가 무대입니다. 악기를 준비하세요.',
+    ], { footer: `Lv${L.id} ${L.name} · ` + (S.vr ? '비상 정지: 왼손 X 버튼' : '비상 정지 Q · 실수 M · 심박 ↑/↓') });
+    S.bsIdx = 0;
+    if (L.timePressure && !S.sc.backstage.some((b) => b.who === 'staff')) setTimeout(() => S.phase === 'backstage' && speak('staff', '5분 전입니다. 준비해 주세요.'), 3000);
   }
   if (ph === 'call') {
     if (!Number.isFinite(S.baseline)) S.baseline = computeBaseline();
     panel.show('무대로 나가세요', ['사회자가 이름을 불렀습니다.', '바닥의 노란 표시까지 걸어 나가세요.'], { footer: '가상 이동 없이 실제로 걸어서 입장합니다' });
-    audio.say(`다음 무대입니다. ${S.name}!`);
+    speak('mc', S.sc.call(S.name), 4);
     setTimeout(() => {
       audio.applause(S.venue.audiencePositions, 0.6, 3.5);
       S.venue.people.forEach((p) => !p.member && !p.judge && Math.random() < 0.6 && p.react('cheer', rand(0.2, 0.8), 2.5));
@@ -173,20 +213,29 @@ function setPhase(ph) {
     S.venue.people.forEach((p) => { if (!p.member) p.eyeContactUntil = S.t + rand(1.5, 3); });
     setTimeout(() => { const f = S.venue.front; if (f.length) audio.cough(f[Math.floor(Math.random() * f.length)].headWorld(tmp).clone()); }, 1300);
     spikeHR(0.06);
+    if (S.sc.preSay) setTimeout(() => speak(S.sc.preSay.who, S.sc.preSay.text, 2.5), 600);
+  }
+  if (ph === 'encore') {
+    // 앵콜 요청: 함성과 박수, 사용자는 무대에 그대로
+    speak('crowd', S.sc.encore.text, 4);
+    audio.chant(S.venue.audiencePositions, 6, 0.75);
+    S.venue.people.forEach((p) => !p.member && !p.judge && Math.random() < 0.8 && p.react('cheer', rand(0.1, 0.6), 4));
+    if (S.venue.crowd) S.venue.crowd.cheer = 5;
+    S.venue.band.forEach((b) => S.pending.push({ at: S.t + 1.5, fn: () => b.eyeContact(S.t) }));
+    setTimeout(() => S.phase === 'encore' && speak('member', '한 곡 더 갈까?', 2.5), 3000);
+    setTimeout(() => S.phase === 'encore' && setPhase('perform'), 5500);
   }
   if (ph === 'perform') {
     audio.setCrowdLevel(0.06, 1);
-    const songSec = (TUNING.countInBeats + TUNING.songBars * 4) * 60 / TUNING.bpm;
+    const bars = S.encoreDone ? S.sc.encore.bars : S.sc.bars;
+    const songSec = (TUNING.countInBeats + bars * 4) * 60 / TUNING.bpm;
+    S.scriptDone = S.scriptDone || new Set();
     S.eventTimes = [];
-    const n = S.director.params().eventsPerSong;
+    const n = S.encoreDone ? 0 : Math.max(0, S.director.params().eventsPerSong - S.sc.script.filter((x) => x.do === 'event').length);
     for (let i = 0; i < n; i++) S.eventTimes.push(S.t + rand(0.15, 0.85) * songSec);
     S.eventTimes.sort((a, b) => a - b);
     S.lastOnsetTime = audio.ctx.currentTime;
-    audio.startBand({
-      bpm: TUNING.bpm, bars: TUNING.songBars, countIn: TUNING.countInBeats,
-      drummerPos: S.venue.drummerPos, bassPos: S.venue.bassPos,
-      onEnd: () => S.phase === 'perform' && setPhase('finish'),
-    });
+    startSong(bars, !S.encoreDone);
   }
   if (ph === 'finish') {
     const m = S.mistakes.length, r = S.tracker.recoveries.length;
@@ -195,16 +244,98 @@ function setPhase(ph) {
     S.venue.people.forEach((p) => !p.member && Math.random() < score && p.react('cheer', reactionDelay(p.row, Math.random(), TUNING), 2 + score * 3));
     if (S.venue.crowd && score > 0.5) S.venue.crowd.cheer = 2 + score * 4;
     if (S.level.id === 1) saveBaseline();
-    setTimeout(() => setPhase('report'), (3 + score * 5) * 1000);
+    if (S.sc.encore && !S.encoreDone && score >= 0.45) {
+      S.encoreDone = true;
+      setTimeout(() => S.phase === 'finish' && setPhase('encore'), 3500);
+    } else {
+      setTimeout(() => S.phase === 'finish' && speak(S.sc.end.who, S.sc.end.text, 3.5), 1200);
+      setTimeout(() => S.phase === 'finish' && setPhase('report'), (4 + score * 3) * 1000);
+    }
   }
   if (ph === 'report') showReport();
   updateHud();
 }
 
-function cue(text) {
-  audio.say(text);
-  log(`무대 감독: ${text}`);
+function startSong(bars, withScript) {
+  const barSec = 4 * 60 / TUNING.bpm;
+  audio.startBand({
+    bpm: TUNING.bpm, bars, countIn: TUNING.countInBeats,
+    drummerPos: S.venue.drummerPos, bassPos: S.venue.bassPos,
+    onBeat: (beat, when) => {
+      const b = beat - TUNING.countInBeats;
+      if (!withScript || b < 0 || b % 4 !== 0) return;
+      const bar = b / 4 + (S.barOffset || 0);
+      const delay = Math.max(0, (when - audio.ctx.currentTime) * 1000);
+      for (const item of S.sc.script) {
+        if (item.bar !== bar || S.scriptDone.has(item)) continue;
+        S.scriptDone.add(item);
+        setTimeout(() => S.phase === 'perform' && runScript(item, barSec), delay);
+      }
+    },
+    onEnd: () => S.phase === 'perform' && setPhase('finish'),
+  });
 }
+
+// 시나리오 대본의 한 장면
+function runScript(item, barSec) {
+  const aud = S.venue.people.filter((p) => !p.member && !p.judge);
+  if (item.do === 'say') speak(item.who, item.text, 2.5);
+  if (item.do === 'event') randomEvent(item.type);
+  if (item.do === 'phonesUp') {
+    aud.filter((p) => p.tier === 'A' && !p.phone && !p.knownFace).slice(0, 4).forEach((p) => { p.addPhone(); p.watcher = true; });
+    log('관객들이 휴대폰을 들어 촬영');
+    spikeHR(0.05);
+  }
+  if (item.do === 'attention') {
+    // 무관심하던 손님들이 하나둘 돌아본다
+    aud.forEach((p) => { if (!p.watcher && Math.random() < 0.7) S.pending.push({ at: S.t + rand(0.2, 2), fn: () => { p.watcher = true; p.removePhone(); } }); });
+    log('손님들이 돌아봄');
+  }
+  if (item.do === 'solo') {
+    // 솔로: 조명이 나에게만 좁아지고, 반주가 물러나고, 모두가 나를 본다
+    if (item.text) speak('member', item.text, 2);
+    S.solo = true;
+    const sp = S.venue.spot;
+    S.soloRestore = { angle: sp.angle, wash: S.venue.wash.intensity };
+    sp.angle = 0.18; S.venue.wash.intensity = 0;
+    audio.setBandLevel(0.45);
+    aud.forEach((p) => { p.watcher = true; });
+    spikeHR(0.08);
+    setTimeout(() => {
+      S.solo = false;
+      sp.angle = S.soloRestore.angle; S.venue.wash.intensity = S.soloRestore.wash;
+      audio.setBandLevel(1);
+      if (S.phase === 'perform') {
+        audio.applause(S.venue.audiencePositions, S.mistakes.length ? 0.4 : 0.8, 2.5);
+        aud.forEach((p) => Math.random() < 0.5 && p.react('cheer', rand(0.2, 0.9), 1.8));
+      }
+    }, item.bars * barSec * 1000);
+  }
+  if (item.do === 'clapAlong') {
+    const beat = 60 / TUNING.bpm, t0 = audio.ctx.currentTime;
+    for (let k = 0; k < item.bars * 4; k++) if (k % 2 === 1) audio.clapAlong(S.venue.audiencePositions, t0 + k * beat);
+    aud.forEach((p) => { if (p.tier === 'A' && !p.phone) p.react('cheer', 0, item.bars * 4 * beat); });
+    if (S.venue.crowd) S.venue.crowd.cheer = item.bars * 4 * beat;
+    log('관객 박수 따라치기');
+  }
+  if (item.do === 'judgeStop') {
+    // 심사위원이 연주를 끊는다: 통제할 수 없는 상황 (E4)
+    audio.stopBand();
+    speak('judge', item.text, 4);
+    S.venue.judges.forEach((j, i) => j.react(i === 1 ? 'write' : 'cold', 0.3, 3));
+    S.mistakes.push(S.t); S.tracker.onMistake(S.t);
+    S.events.push({ t: S.t, type: 'judgeStop' });
+    spikeHR(0.15);
+    audio.setCrowdLevel(0.0, 0.3);
+    setTimeout(() => {
+      if (S.phase !== 'perform') return;
+      speak('judge', '준비되면 다시 시작하세요.', 2.5);
+      S.barOffset = item.bar + 1;
+      setTimeout(() => S.phase === 'perform' && startSong(item.restartBars, true), 2000);
+    }, 4500);
+  }
+}
+
 
 // 기준선: 연습실(Lv1) 연주 중 평균 심박이 있으면 그것, 없으면 대기실 안정 심박 × 1.1
 function computeBaseline() {
@@ -272,9 +403,9 @@ function onRecovered(dur) {
 }
 
 // ---------- 예측 불가 사건 (E4) ----------
-function randomEvent() {
+function randomEvent(forced) {
   const types = ['phoneRing', 'monitorDrop', 'lateComer', 'cough', 'flicker'];
-  const type = types[Math.floor(Math.random() * types.length)];
+  const type = forced || types[Math.floor(Math.random() * types.length)];
   const aud = S.venue.people.filter((p) => !p.member && !p.judge);
   log(`사건: ${type}`);
   S.events.push({ t: S.t, type });
@@ -434,6 +565,7 @@ function frame() {
 function step(dt, cam) {
   const L = S.level, now = S.t;
   audio.updateListener(cam);
+  if (subtitle.mesh.visible && now > subtitle.until) { subtitle.mesh.visible = false; $('#subtitle').hidden = true; }
 
   // 눈 적응
   renderer.toneMappingExposure += (S.exposureTarget - renderer.toneMappingExposure) * Math.min(1, dt / 0.6);
@@ -468,9 +600,11 @@ function step(dt, cam) {
   // 단계 진행
   if (S.phase === 'backstage') {
     const k = Math.min(1, (now - S.phaseStart) / L.backstageSec);
+    const line = S.sc.backstage[S.bsIdx];
+    if (line && now - S.phaseStart >= line.at) { S.bsIdx++; speak(line.who, line.text, 3.5); }
     audio.setCrowdLevel(0.4 + 0.6 * k, 2);
     drawMonitor(k);
-    if (L.timePressure && L.backstageSec > 15 && !S._cue30 && now - S.phaseStart > L.backstageSec - 10) { S._cue30 = true; cue('30초 전입니다. 무대로 이동할 준비 하세요.'); }
+    if (L.timePressure && L.backstageSec > 15 && !S._cue30 && now - S.phaseStart > L.backstageSec - 8) { S._cue30 = true; speak('staff', '30초 전입니다. 무대로 이동할 준비 하세요.'); }
     if (now - S.phaseStart > L.backstageSec) setPhase('call');
   }
   if (S.phase === 'call') {
@@ -590,7 +724,7 @@ function drawMonitor(k) {
 // ---------- 리포트 ----------
 function reportData() {
   return {
-    level: S.level.id, levelName: S.level.name,
+    level: S.level.id, levelName: S.level.name, scenario: S.sc.title, encore: !!S.encoreDone,
     hrSource: S.hr.simulated ? '시뮬레이션 심박' : S.hr.name,
     baseline: S.baseline, baselineSource: S.baselineSource, mic: !!S.mic,
     hr: S.hrLog, mistakes: S.mistakes, recoveries: S.tracker.recoveries,
@@ -627,7 +761,7 @@ function log(msg) {
   el.prepend(line);
   while (el.childNodes.length > 14) el.removeChild(el.lastChild);
 }
-const PHASE = { menu: '시작 전', backstage: '대기실', call: '호명·입장', hush: '첫 소절 직전', perform: '연주 중', finish: '종료', report: '리포트', stopped: '비상 정지' };
+const PHASE = { menu: '시작 전', backstage: '대기실', call: '호명·입장', hush: '첫 소절 직전', perform: '연주 중', encore: '앵콜 요청', finish: '종료', report: '리포트', stopped: '비상 정지' };
 function updateHud(ratio) {
   if (!S.level) return;
   const p = S.director ? S.director.params() : {};
