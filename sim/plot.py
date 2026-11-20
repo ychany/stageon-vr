@@ -12,7 +12,7 @@ plt.rcParams["font.family"] = "Noto Sans CJK JP"
 plt.rcParams["axes.unicode_minus"] = False
 
 r = json.load(open("sim/out/results.json", encoding="utf-8"))
-NAVY, PURPLE, GOLD, GRAY = "#1E1B3A", "#6C5CE7", "#E8A33D", "#B9B4D6"
+NAVY, PURPLE, GOLD, GRAY = "#1F2937", "#0F766E", "#D97706", "#CBD5E1"   # 진한 회색 · 청록 · 주황 · 연회색
 
 fig, ax = plt.subplots(1, 3, figsize=(15, 4.6))
 fig.suptitle(f"StageOn AI 시뮬레이션 (가상 참가자 {r['participants']}명 · 실제 사람 데이터 아님)", fontsize=14, color=NAVY)
