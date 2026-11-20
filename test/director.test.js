@@ -68,14 +68,25 @@ test('불안 조절: SUDs 8점 이상이면 즉시 완화', () => {
   assert.equal(a.type, 'calm');
 });
 
-test('회복: 기준선 +10% 이내로 8마디 → 회복 시간 기록', () => {
+test('회복: 실수 직전 수준(+5%p 이내)으로 4마디 → 회복 시간 기록', () => {
   const bar = 2.4;
   const r = new RecoveryTracker(TUNING, bar);
-  r.onMistake(10);
-  assert.equal(r.update(12, 0.3), null);
-  assert.equal(r.update(15, 0.08), null);
-  const d = r.update(15 + 8 * bar, 0.05);
-  assert.ok(Math.abs(d - (5 + 8 * bar)) < 1e-9);
+  r.onMistake(10, 0.25);                        // 실수 직전 +25%
+  assert.equal(r.update(12, 0.38), null);       // 실수로 치솟음
+  assert.equal(r.update(15, 0.29), null);       // +30% 이내로 돌아옴 → 유지 시작
+  const d = r.update(15 + 4 * bar, 0.28);
+  assert.ok(Math.abs(d - (5 + 4 * bar)) < 1e-9);
+});
+
+test('회복: 유지 중 다시 오르면 처음부터', () => {
+  const bar = 2.4;
+  const r = new RecoveryTracker(TUNING, bar);
+  r.onMistake(0, 0.2);
+  r.update(2, 0.22);
+  assert.equal(r.update(5, 0.4), null);
+  assert.equal(r.update(6, 0.2), null);
+  assert.equal(r.update(6 + 4 * bar - 0.1, 0.2), null);
+  assert.ok(r.update(6 + 4 * bar, 0.2) !== null);
 });
 
 test('반응 지연은 0.3–1.5초, 앞줄이 더 빠름', () => {

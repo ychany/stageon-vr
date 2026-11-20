@@ -1,0 +1,361 @@
+{
+  "note": "AI 시뮬레이션(가상 참가자) 결과이며 실제 사람의 측정값이 아니다. 수치는 assumptions의 가정에 따라 달라진다.",
+  "participants": 30,
+  "seed": 42,
+  "scenario": "밴드 첫 클럽 공연 (Lv3)",
+  "assumptions": {
+    "연주 동작에 의한 심박 증가 (모든 조건)": "+8%",
+    "단서별 기본 민감도 (심박 증가 비율)": {
+      "gaze": 0.1,
+      "eval": 0.16,
+      "mistake": 0.12,
+      "events": 0.13,
+      "body": 0.06
+    },
+    "불안 특성(trait)": "평균 1.0, 표준편차 0.3 (곱셈 계수)",
+    "VR 실재감 계수 (가상 관객이 실제 관객만큼 위협적으로 느껴지는 정도)": "참가자마다 0.65–0.95 균등분포",
+    "실수 확률": "마디당 4% × (1 + 각성도), 실수 시 일시적 심박 +6%p",
+    "반복 노출 적응": "회차마다 새로움 효과 15% 감소 (0.85^회차)",
+    "심박 측정 잡음": "표준편차 2 bpm"
+  },
+  "experimentA": {
+    "meanHR": {
+      "practice": 76.44,
+      "vr": 97.22,
+      "real": 100.73
+    },
+    "reproductionRatePct": {
+      "mean": 86.34,
+      "sd": 9.61,
+      "over80": 21
+    },
+    "perParticipant": [
+      {
+        "id": 1,
+        "practice": 62.29,
+        "vr": 88.97,
+        "real": 94.11,
+        "rate": 0.84,
+        "vrInZone": 0.35,
+        "adjustments": 1
+      },
+      {
+        "id": 2,
+        "practice": 84.54,
+        "vr": 94.96,
+        "real": 97.46,
+        "rate": 0.81,
+        "vrInZone": 0,
+        "adjustments": 4
+      },
+      {
+        "id": 3,
+        "practice": 58.95,
+        "vr": 74.53,
+        "real": 78.09,
+        "rate": 0.81,
+        "vrInZone": 0.76,
+        "adjustments": 1
+      },
+      {
+        "id": 4,
+        "practice": 91.65,
+        "vr": 121.67,
+        "real": 127.33,
+        "rate": 0.84,
+        "vrInZone": 0.82,
+        "adjustments": 1
+      },
+      {
+        "id": 5,
+        "practice": 73.53,
+        "vr": 91.94,
+        "real": 95.04,
+        "rate": 0.86,
+        "vrInZone": 0.76,
+        "adjustments": 1
+      },
+      {
+        "id": 6,
+        "practice": 80.03,
+        "vr": 99.36,
+        "real": 98.1,
+        "rate": 1.07,
+        "vrInZone": 0.74,
+        "adjustments": 1
+      },
+      {
+        "id": 7,
+        "practice": 70.7,
+        "vr": 100.03,
+        "real": 110.26,
+        "rate": 0.74,
+        "vrInZone": 0.35,
+        "adjustments": 0
+      },
+      {
+        "id": 8,
+        "practice": 66.11,
+        "vr": 81.48,
+        "real": 85.82,
+        "rate": 0.78,
+        "vrInZone": 0.62,
+        "adjustments": 2
+      },
+      {
+        "id": 9,
+        "practice": 85.72,
+        "vr": 106.84,
+        "real": 109.19,
+        "rate": 0.9,
+        "vrInZone": 0.74,
+        "adjustments": 1
+      },
+      {
+        "id": 10,
+        "practice": 72.86,
+        "vr": 85.04,
+        "real": 87.5,
+        "rate": 0.83,
+        "vrInZone": 0.24,
+        "adjustments": 3
+      },
+      {
+        "id": 11,
+        "practice": 79.24,
+        "vr": 102.46,
+        "real": 105.89,
+        "rate": 0.87,
+        "vrInZone": 0.79,
+        "adjustments": 1
+      },
+      {
+        "id": 12,
+        "practice": 85.8,
+        "vr": 107.24,
+        "real": 114.89,
+        "rate": 0.74,
+        "vrInZone": 0.71,
+        "adjustments": 1
+      },
+      {
+        "id": 13,
+        "practice": 62.2,
+        "vr": 79.95,
+        "real": 82.94,
+        "rate": 0.86,
+        "vrInZone": 0.79,
+        "adjustments": 1
+      },
+      {
+        "id": 14,
+        "practice": 66.56,
+        "vr": 84.86,
+        "real": 87.67,
+        "rate": 0.87,
+        "vrInZone": 0.76,
+        "adjustments": 1
+      },
+      {
+        "id": 15,
+        "practice": 88.6,
+        "vr": 124.98,
+        "real": 127.06,
+        "rate": 0.95,
+        "vrInZone": 0.41,
+        "adjustments": 0
+      },
+      {
+        "id": 16,
+        "practice": 79.61,
+        "vr": 100.16,
+        "real": 106.51,
+        "rate": 0.76,
+        "vrInZone": 0.71,
+        "adjustments": 1
+      },
+      {
+        "id": 17,
+        "practice": 78.07,
+        "vr": 93.81,
+        "real": 93.79,
+        "rate": 1,
+        "vrInZone": 0.56,
+        "adjustments": 2
+      },
+      {
+        "id": 18,
+        "practice": 81.09,
+        "vr": 111.6,
+        "real": 121.95,
+        "rate": 0.75,
+        "vrInZone": 0.47,
+        "adjustments": 1
+      },
+      {
+        "id": 19,
+        "practice": 82.37,
+        "vr": 116.31,
+        "real": 118.46,
+        "rate": 0.94,
+        "vrInZone": 0.35,
+        "adjustments": 0
+      },
+      {
+        "id": 20,
+        "practice": 76.64,
+        "vr": 95.16,
+        "real": 100.45,
+        "rate": 0.78,
+        "vrInZone": 0.76,
+        "adjustments": 1
+      },
+      {
+        "id": 21,
+        "practice": 78.51,
+        "vr": 97.28,
+        "real": 96.53,
+        "rate": 1.04,
+        "vrInZone": 0.65,
+        "adjustments": 2
+      },
+      {
+        "id": 22,
+        "practice": 92.88,
+        "vr": 117.28,
+        "real": 115.9,
+        "rate": 1.06,
+        "vrInZone": 0.68,
+        "adjustments": 2
+      },
+      {
+        "id": 23,
+        "practice": 77.94,
+        "vr": 98.59,
+        "real": 105.36,
+        "rate": 0.75,
+        "vrInZone": 0.76,
+        "adjustments": 1
+      },
+      {
+        "id": 24,
+        "practice": 69.92,
+        "vr": 89.68,
+        "real": 91.64,
+        "rate": 0.91,
+        "vrInZone": 0.76,
+        "adjustments": 1
+      },
+      {
+        "id": 25,
+        "practice": 74.33,
+        "vr": 99.26,
+        "real": 103.67,
+        "rate": 0.85,
+        "vrInZone": 0.62,
+        "adjustments": 1
+      },
+      {
+        "id": 26,
+        "practice": 81.9,
+        "vr": 95.41,
+        "real": 96.2,
+        "rate": 0.94,
+        "vrInZone": 0.24,
+        "adjustments": 3
+      },
+      {
+        "id": 27,
+        "practice": 63.85,
+        "vr": 78.53,
+        "real": 84.28,
+        "rate": 0.72,
+        "vrInZone": 0.65,
+        "adjustments": 2
+      },
+      {
+        "id": 28,
+        "practice": 71.28,
+        "vr": 92.49,
+        "real": 93.82,
+        "rate": 0.94,
+        "vrInZone": 0.79,
+        "adjustments": 1
+      },
+      {
+        "id": 29,
+        "practice": 81.38,
+        "vr": 99.33,
+        "real": 101.22,
+        "rate": 0.9,
+        "vrInZone": 0.65,
+        "adjustments": 2
+      },
+      {
+        "id": 30,
+        "practice": 74.62,
+        "vr": 87.49,
+        "real": 90.78,
+        "rate": 0.8,
+        "vrInZone": 0.26,
+        "adjustments": 3
+      }
+    ]
+  },
+  "experimentB": [
+    {
+      "cue": "gaze",
+      "meanDropPct": 5.01,
+      "sdPct": 2.34,
+      "name": "E1 시선"
+    },
+    {
+      "cue": "eval",
+      "meanDropPct": 7.21,
+      "sdPct": 2.77,
+      "name": "E2 평가"
+    },
+    {
+      "cue": "mistake",
+      "meanDropPct": 5.55,
+      "sdPct": 2.51,
+      "name": "E3 실수 반응"
+    },
+    {
+      "cue": "events",
+      "meanDropPct": 5.47,
+      "sdPct": 2.67,
+      "name": "E4 예측 불가 사건"
+    },
+    {
+      "cue": "body",
+      "meanDropPct": 4.42,
+      "sdPct": 2.48,
+      "name": "E5 심박 되비추기"
+    }
+  ],
+  "experimentC": [
+    {
+      "session": 1,
+      "meanRatioPct": 25.37,
+      "meanRecoverySec": null,
+      "recoveries": 0
+    },
+    {
+      "session": 2,
+      "meanRatioPct": 21.89,
+      "meanRecoverySec": 10,
+      "recoveries": 2
+    },
+    {
+      "session": 3,
+      "meanRatioPct": 19.51,
+      "meanRecoverySec": 10,
+      "recoveries": 2
+    }
+  ],
+  "director": {
+    "inZonePctWithEngine": 59.22,
+    "inZonePctWithoutEngine": 55.59
+  }
+}

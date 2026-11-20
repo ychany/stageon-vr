@@ -1,14 +1,14 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js?v=202611202256';
-import { buildVenue } from './venue.js?v=202611202256';
-import { AudioEngine } from './audio.js?v=202611202256';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611202256';
-import { InstrumentInput } from './mic.js?v=202611202256';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js?v=202611202256';
-import { FloatingPanel, drawReport } from './ui.js?v=202611202256';
-import { Person, rand } from './figures.js?v=202611202256';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611202256';
+import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js?v=202611202258';
+import { buildVenue } from './venue.js?v=202611202258';
+import { AudioEngine } from './audio.js?v=202611202258';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611202258';
+import { InstrumentInput } from './mic.js?v=202611202258';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js?v=202611202258';
+import { FloatingPanel, drawReport } from './ui.js?v=202611202258';
+import { Person, rand } from './figures.js?v=202611202258';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611202258';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -350,7 +350,7 @@ function runScript(item, barSec) {
     audio.stopBand();
     speak('judge', item.text, 4);
     S.venue.judges.forEach((j, i) => j.react(i === 1 ? 'write' : 'cold', 0.3, 3));
-    S.mistakes.push(S.t); S.tracker.onMistake(S.t);
+    S.mistakes.push(S.t); S.tracker.onMistake(S.t, S.lastRatio);
     S.events.push({ t: S.t, type: 'judgeStop' });
     spikeHR(0.15);
     audio.setCrowdLevel(0.0, 0.3);
@@ -394,7 +394,7 @@ function onMistake(source) {
   if (S.phase !== 'perform') return;
   const now = S.t;
   S.mistakes.push(now);
-  S.tracker.onMistake(now);
+  S.tracker.onMistake(now, S.lastRatio);
   log(`실수 (${source})`);
   spikeHR(0.12);
   const p = P();
@@ -676,6 +676,7 @@ function step(dt, cam) {
   }
   const base = Number.isFinite(S.baseline) ? S.baseline : (S.restSamples.length ? S.restSamples.reduce((a, b) => a + b, 0) / S.restSamples.length * 1.1 : 79);
   const ratio = S.hrAvg.value / base - 1;
+  S.lastRatio = ratio;
   if (!S._lastLog || now - S._lastLog > 0.5) {
     S._lastLog = now;
     S.hrLog.push({ t: now, hr: bpm, ratio, phase: S.phase, intensity: S.director.intensity, calm: S.director.calm });

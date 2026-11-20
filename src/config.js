@@ -105,8 +105,8 @@ export const TUNING = {
   silenceSec: 3.0,                           // 정적 3초 → 술렁임
   // E5 심박
   heartbeatOnRatio: 0.30,                    // 기준선 +30% 이상
-  recoveryRatio: 0.10,                       // 기준선 +10% 이내
-  recoveryBars: 8,                           // 8마디 연속
+  recoveryMargin: 0.05,                      // 실수 직전 심박 수준 +5%p 이내로 돌아오면
+  recoveryBars: 4,                           // 4마디(약 10초) 연속 유지 → 회복
   // 불안 조절 엔진 (4-3)
   targetLow: 0.20, targetHigh: 0.40,         // 목표 구간 +20–40%
   overloadRatio: 0.50, overloadHold: 15,     // +50% 15초 지속 → 완화

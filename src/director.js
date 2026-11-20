@@ -131,23 +131,26 @@ export class StressorDirector {
   }
 }
 
-// 실수 후 회복 시간 측정: 실수 이후 (심박 ≤ 기준선 +10%) 상태로 8마디 연속 실수 없이 이어가면 회복
+// 실수 후 회복 시간 측정: 실수 직전 심박 수준(+5%p 이내)으로 돌아와 4마디 동안 실수 없이 이어가면 회복.
+// (처음 설계는 '기준선 +10% 이내'였지만, 무대 위 목표 구간이 +20–40%라 무대에서는 회복이 거의 판정되지
+//  않는 문제가 AI 시뮬레이션에서 드러나 실수 직전 수준을 기준으로 바꿨다.)
 export class RecoveryTracker {
   constructor(tuning, barSec) {
     this.t = tuning;
     this.barSec = barSec;
-    this.pendingSince = null;  // 마지막 실수 시각
+    this.pendingSince = null;  // 첫 실수 시각
     this.stableSince = null;
+    this.pre = null;           // 실수 직전 심박 비율
     this.recoveries = [];      // 회복까지 걸린 시간(초)
   }
-  onMistake(now) {
-    if (this.pendingSince === null) this.pendingSince = now;
+  onMistake(now, ratioNow = 0) {
+    if (this.pendingSince === null) { this.pendingSince = now; this.pre = Number.isFinite(ratioNow) ? ratioNow : 0; }
     this.stableSince = null;
     this.lastMistake = now;
   }
   update(now, ratio) {
     if (this.pendingSince === null) return null;
-    const ok = ratio <= this.t.recoveryRatio;
+    const ok = ratio <= this.pre + this.t.recoveryMargin;
     if (!ok) { this.stableSince = null; return null; }
     if (this.stableSince === null) this.stableSince = Math.max(now, this.lastMistake);
     if (now - this.stableSince >= this.t.recoveryBars * this.barSec) {
