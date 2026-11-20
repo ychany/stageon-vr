@@ -1,14 +1,14 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js?v=202611202246';
-import { buildVenue } from './venue.js?v=202611202246';
-import { AudioEngine } from './audio.js?v=202611202246';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611202246';
-import { InstrumentInput } from './mic.js?v=202611202246';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js?v=202611202246';
-import { FloatingPanel, drawReport } from './ui.js?v=202611202246';
-import { Person, rand } from './figures.js?v=202611202246';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611202246';
+import { LEVELS, TUNING, STAGE, SCENARIOS } from './config.js?v=202611202256';
+import { buildVenue } from './venue.js?v=202611202256';
+import { AudioEngine } from './audio.js?v=202611202256';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611202256';
+import { InstrumentInput } from './mic.js?v=202611202256';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay } from './director.js?v=202611202256';
+import { FloatingPanel, drawReport } from './ui.js?v=202611202256';
+import { Person, rand } from './figures.js?v=202611202256';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611202256';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -127,6 +127,8 @@ async function begin(vr) {
   const sc = SCENARIOS[Number($('input[name=scenario]:checked').value)];
   const level = LEVELS[sc.level];
   S.sc = sc;
+  S.cues = { gaze: $('#cueGaze').checked, eval: $('#cueEval').checked, mistake: $('#cueMistake').checked, events: $('#cueEvents').checked, body: $('#cueBody').checked };
+  S.helper = $('#helper').checked;
   S.name = $('#name').value.trim() || '연주자';
   S.level = level;
   S.vr = vr;
@@ -216,7 +218,7 @@ function setPhase(ph) {
     S.venue.wash.intensity = 3;
     renderer.toneMappingExposure = 2.6;
     S.exposureTarget = 1;
-    S.venue.hemi.intensity = S.director.params().houseLight;
+    S.venue.hemi.intensity = P().houseLight;
     S.venue.backLight.intensity = 0.5;
     S.venue.mark.material.opacity = 0.9;
     spikeHR(0.12);
@@ -225,7 +227,7 @@ function setPhase(ph) {
     panel.hide();
     S.venue.mark.material.opacity = 0;
     audio.setCrowdLevel(0.04, 1);
-    S.venue.people.forEach((p) => { if (!p.member) p.eyeContactUntil = S.t + rand(1.5, 3); });
+    if (S.cues.gaze) S.venue.people.forEach((p) => { if (!p.member) p.eyeContactUntil = S.t + rand(1.5, 3); });
     setTimeout(() => { const f = S.venue.front; if (f.length) audio.cough(f[Math.floor(Math.random() * f.length)].headWorld(tmp).clone()); }, 1300);
     spikeHR(0.06);
     if (S.sc.preSay) setTimeout(() => speak(S.sc.preSay.who, S.sc.preSay.text, 2.5), 600);
@@ -246,7 +248,7 @@ function setPhase(ph) {
     const songSec = (TUNING.countInBeats + bars * 4) * 60 / TUNING.bpm;
     S.scriptDone = S.scriptDone || new Set();
     S.eventTimes = [];
-    const n = S.encoreDone ? 0 : Math.max(0, S.director.params().eventsPerSong - S.sc.script.filter((x) => x.do === 'event').length);
+    const n = S.encoreDone ? 0 : Math.max(0, P().eventsPerSong - S.sc.script.filter((x) => x.do === 'event').length);
     for (let i = 0; i < n; i++) S.eventTimes.push(S.t + rand(0.15, 0.85) * songSec);
     S.eventTimes.sort((a, b) => a - b);
     S.lastOnsetTime = audio.ctx.currentTime;
@@ -264,10 +266,18 @@ function setPhase(ph) {
       setTimeout(() => S.phase === 'finish' && setPhase('encore'), 3500);
     } else {
       setTimeout(() => S.phase === 'finish' && speak(S.sc.end.who, S.sc.end.text, 3.5), 1200);
-      setTimeout(() => S.phase === 'finish' && setPhase('report'), (4 + score * 3) * 1000);
+      setTimeout(() => S.phase === 'finish' && setPhase('suds'), (4 + score * 3) * 1000);
     }
   }
-  if (ph === 'report') showReport();
+  if (ph === 'suds') {
+    // 공연 직후 주관적 불안 점수 (0–10)
+    audio.setHeartbeatVolume(0);
+    S.sudsPost = S.sudsPost ?? 5;
+    drawSudsPanel();
+    $('#sudsBox').hidden = false;
+    if (document.pointerLockElement) document.exitPointerLock();
+  }
+  if (ph === 'report') { $('#sudsBox').hidden = true; showReport(); }
   updateHud();
 }
 
@@ -295,6 +305,8 @@ function startSong(bars, withScript) {
 function runScript(item, barSec) {
   const aud = S.venue.people.filter((p) => !p.member && !p.judge);
   if (item.do === 'say') speak(item.who, item.text, 2.5);
+  if (!S.cues.events && ['event', 'judgeStop'].includes(item.do)) return;
+  if (!S.cues.eval && item.do === 'phonesUp') return;
   if (item.do === 'event') randomEvent(item.type);
   if (item.do === 'phonesUp') {
     aud.filter((p) => p.tier === 'A' && !p.phone && !p.knownFace).slice(0, 4).forEach((p) => { p.addPhone(); p.watcher = true; });
@@ -303,7 +315,7 @@ function runScript(item, barSec) {
   }
   if (item.do === 'attention') {
     // 무관심하던 손님들이 하나둘 돌아본다
-    aud.forEach((p) => { if (!p.watcher && Math.random() < 0.7) S.pending.push({ at: S.t + rand(0.2, 2), fn: () => { p.watcher = true; p.removePhone(); } }); });
+    if (S.cues.gaze) aud.forEach((p) => { if (!p.watcher && Math.random() < 0.7) S.pending.push({ at: S.t + rand(0.2, 2), fn: () => { p.watcher = true; p.removePhone(); } }); });
     log('손님들이 돌아봄');
   }
   if (item.do === 'solo') {
@@ -314,7 +326,7 @@ function runScript(item, barSec) {
     S.soloRestore = { angle: sp.angle, wash: S.venue.wash.intensity };
     sp.angle = 0.18; S.venue.wash.intensity = 0;
     audio.setBandLevel(0.45);
-    aud.forEach((p) => { p.watcher = true; });
+    if (S.cues.gaze) aud.forEach((p) => { p.watcher = true; });
     spikeHR(0.08);
     setTimeout(() => {
       S.solo = false;
@@ -385,7 +397,7 @@ function onMistake(source) {
   S.tracker.onMistake(now);
   log(`실수 (${source})`);
   spikeHR(0.12);
-  const p = S.director.params();
+  const p = P();
   S.murmurBudget = 5;
   for (const person of S.venue.people) {
     if (person.member || person.judge) continue;
@@ -394,8 +406,10 @@ function onMistake(source) {
   if (S.venue.crowd && p.reaction > 0.5) {
     setTimeout(() => S.venue.audiencePositions.slice(-4).forEach((pos) => audio.murmur(pos, 1.4, 0.35)), 1100);
   }
-  audio.setCrowdLevel(0.25, 0.6);
-  setTimeout(() => S.phase === 'perform' && audio.setCrowdLevel(0.06, 2), 2500);
+  if (S.cues.mistake) {
+    audio.setCrowdLevel(0.25, 0.6);
+    setTimeout(() => S.phase === 'perform' && audio.setCrowdLevel(0.06, 2), 2500);
+  }
   if (p.judgeNotes) S.venue.judges.forEach((j, i) => {
     const d = rand(0.4, 1.2);
     j.react(i === 1 && Math.random() < 0.4 ? 'watch' : 'write', d, 1.6);
@@ -413,7 +427,7 @@ function onMurmur(person) {
 
 function onRecovered(dur) {
   log(`회복 (${dur.toFixed(1)}초)`);
-  S.venue.people.forEach((p) => { if (!p.member && !p.judge) { p.watcher = Math.random() < S.director.params().gazeRatio + 0.1; if (Math.random() < 0.3) p.react('cheer', rand(0.3, 1.2), 1.5); } });
+  S.venue.people.forEach((p) => { if (!p.member && !p.judge) { p.watcher = Math.random() < P().gazeRatio + 0.1; if (Math.random() < 0.3) p.react('cheer', rand(0.3, 1.2), 1.5); } });
   audio.applause(S.venue.audiencePositions.slice(0, 6), 0.4, 1.8);
 }
 
@@ -456,16 +470,29 @@ function randomEvent(forced) {
 
 // ---------- 조절 엔진 적용 ----------
 function applyParams() {
-  const p = S.director.params();
+  const p = P();
   const aud = S.venue.people.filter((x) => !x.member && !x.judge);
   aud.forEach((x) => { if (!x.knownFace) x.watcher = Math.random() < p.gazeRatio; });
   if (S.level.mood === 'indifferent') aud.forEach((x) => { if (Math.random() < 0.3) x.watcher = false; });
   const filmers = S.venue.front.filter((x) => !x.member && !x.judge && !x.knownFace);
   const want = Math.min(filmers.length, p.phones);
   filmers.forEach((x, i) => (i < want ? x.addPhone() : x.removePhone()));
-  filmers.slice(0, want).forEach((x) => { x.watcher = true; });
+  if (S.cues.gaze) filmers.slice(0, want).forEach((x) => { x.watcher = true; });
+  S.venue.judges.forEach((j) => { j.watcher = S.cues.gaze; });
   if (S.phase !== 'backstage' && S.phase !== 'menu') S.venue.hemi.intensity = p.houseLight;
   S.venue.judges.forEach((j) => { if (!p.friendly) j.state = 'cold', j.stateUntil = Infinity; else j.state = 'idle'; });
+}
+
+// 실험용 단서 끄기 (보고서 2-5 실험 B): 끈 단서는 조절 엔진 결과에서 빠진다
+function P() {
+  const p = S.director.params();
+  const c = S.cues || {};
+  if (c.gaze === false) p.gazeRatio = 0;
+  if (c.eval === false) { p.phones = 0; p.judgeNotes = false; }
+  if (c.mistake === false) { p.reaction = 0; p.memberLook = false; }
+  if (c.events === false) p.eventsPerSong = 0;
+  if (c.body === false) p.heartbeat = false;
+  return p;
 }
 
 function spikeHR(a) { if (S.hr && S.hr.simulated) S.hr.spike(a); }
@@ -492,7 +519,7 @@ function currentRoot(t) {
   return roots[Math.floor(bar / 2) % 4];
 }
 function strum() {
-  if (!S.sound || ['menu', 'stopped', 'report'].includes(S.phase)) return;
+  if (!S.sound || ['menu', 'stopped', 'report', 'suds'].includes(S.phase)) return;
   const t = audio.ctx.currentTime;
   S.sound.strum(currentRoot(t), t);
   if (S.inst) S.inst.strum();
@@ -515,7 +542,8 @@ function skip() {
   if (S.phase === 'backstage') setPhase('call');
   else if (S.phase === 'call' && !S.vr) { camera.position.set(0, 1.6, STAGE.stageMarkZ); }
   else if (S.phase === 'perform') { audio.stopBand(); log('연주 건너뛰기'); setPhase('finish'); }
-  else if (S.phase === 'encore') { S.encoreDone = true; setPhase('report'); }
+  else if (S.phase === 'encore') { S.encoreDone = true; setPhase('suds'); }
+  else if (S.phase === 'finish') setPhase('suds');
 }
 $('#skipBtn').addEventListener('click', skip);
 
@@ -539,6 +567,7 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'ArrowUp' && S.hr.nudge) S.hr.nudge(0.05);
   if (e.code === 'ArrowDown' && S.hr.nudge) S.hr.nudge(-0.05);
   if (e.code === 'Enter' && S.phase === 'backstage') setPhase('call');   // 대기 건너뛰기 (시연용)
+  if (/^Digit[0-9]$/.test(e.code) && S.phase === 'suds') { setSuds(Number(e.code.slice(5)), true); return; }
   if (/^Digit[0-9]$/.test(e.code)) { S.suds = Number(e.code.slice(5)); S.sudsLog.push({ t: S.t, suds: S.suds }); log(`SUDs ${S.suds}`); }
 });
 document.addEventListener('keyup', (e) => keys.delete(e.code));
@@ -590,6 +619,13 @@ function pollXRInput() {
     const prev = prevButtons.get(src) || [];
     const pressed = (i) => gp.buttons[i] && gp.buttons[i].pressed && !prev[i];
     if (src.handedness === 'left' && pressed(4)) emergencyStop();             // X 버튼
+    if (S.phase === 'suds' && src.handedness === 'right') {
+      const ax = gp.axes[2] || 0;
+      if (Math.abs(ax) > 0.7 && S.t - (S._sudsMove || 0) > 0.3) { S._sudsMove = S.t; setSuds(S.sudsPost + Math.sign(ax)); }
+      if (pressed(0)) setSuds(S.sudsPost, true);
+      prevButtons.set(src, gp.buttons.map((b) => b.pressed));
+      continue;
+    }
     if (src.handedness === 'right' && pressed(0)) {                              // 트리거: 교정 또는 스트럼
       if (S.inst && S.inst.ghost && S.inst.ghost.visible) calibrateInstrument();
       else strum();
@@ -648,7 +684,7 @@ function step(dt, cam) {
 
   // 시뮬레이션 심박: 환경 압박
   if (S.hr.simulated) {
-    const p = S.director.params();
+    const p = P();
     let pressure = 0;
     if (S.phase === 'backstage') pressure = 0.02 * L.id * Math.min(1, (now - S.phaseStart) / L.backstageSec) + 0.02;
     else if (['call', 'hush', 'perform', 'finish'].includes(S.phase)) {
@@ -696,7 +732,7 @@ function step(dt, cam) {
       onMistake('정적 3초');
     }
     // 심박 되비추기 (E5)
-    const p = S.director.params();
+    const p = P();
     const hbOn = p.heartbeat && ratio >= TUNING.heartbeatOnRatio;
     audio.setHeartbeatVolume(hbOn ? 0.8 : 0);
     if (hbOn && now >= S.nextHeartbeat) {
@@ -705,13 +741,14 @@ function step(dt, cam) {
       haptic(0.5, 60);
     }
     gazeTracking(dt, cam, now);
+    breathingGuide(ratio, now);
   }
 
   // 지연 실행
   for (let i = S.pending.length - 1; i >= 0; i--) if (now >= S.pending[i].at) { S.pending[i].fn(); S.pending.splice(i, 1); }
 
   // 인물 업데이트
-  const ctx = { userHead, idleTarget: S.venue.idleTarget, params: S.director.params(), tmp, tmp2, onMurmur };
+  const ctx = { userHead, idleTarget: S.venue.idleTarget, params: P(), tmp, tmp2, onMurmur };
   for (const p of S.venue.people) {
     if (p.walk) {
       const k = Math.min(1, (now - p.walk.start) / p.walk.dur);
@@ -736,14 +773,30 @@ function step(dt, cam) {
   updateHud(ratio);
 }
 
+// 회복 도우미: 심박이 +40%를 넘으면 들숨 4초 · 날숨 6초 호흡 안내
+const breath = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.058, 48), new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0, depthTest: false }));
+breath.position.set(0.32, -0.22, -0.9); breath.renderOrder = 21;
+camera.add(breath);
+function breathingGuide(ratio, now) {
+  const on = S.helper && S.phase === 'perform' && (ratio >= 0.4 || (S.breathOn && ratio > 0.3));
+  S.breathOn = on;
+  const ph = now % 10, k = ph < 4 ? ph / 4 : 1 - (ph - 4) / 6;     // 0→1 들숨, 1→0 날숨
+  breath.material.opacity += ((on ? 0.8 : 0) - breath.material.opacity) * 0.05;
+  breath.scale.setScalar(0.6 + k * 0.9);
+  const el = $('#breath');
+  el.hidden = !on;
+  if (on) { el.style.transform = `scale(${0.6 + k * 0.9})`; el.dataset.label = ph < 4 ? '들숨' : '날숨'; el.textContent = el.dataset.label; }
+}
+
 // 시선: 눈맞춤(E1)과 시선 회피 측정
 function gazeTracking(dt, cam, now) {
   cam.getWorldDirection(tmp);
+  const gazeOn = S.cues.gaze;
   const pitchDeg = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(tmp.y, -1, 1)));
   if (pitchDeg < TUNING.gazeAvoidPitchDeg) {
     S.gazeAvoid += dt;
     S.avoidHold += dt;
-    if (S.avoidHold > TUNING.gazeAvoidHold && !S.avoidEpisode) {
+    if (gazeOn && S.avoidHold > TUNING.gazeAvoidHold && !S.avoidEpisode) {
       S.avoidEpisode = true;
       // 시선을 피하면 앞줄 관객이 고개를 기울여 다시 눈을 맞추려 한다
       S.venue.front.filter((p) => p.watcher && !p.member).forEach((p) => p.react('lean', rand(0.2, 0.8), 2.5));
@@ -758,7 +811,7 @@ function gazeTracking(dt, cam, now) {
     if (ang < bestAng) { bestAng = ang; best = p; }
   }
   for (const [p, h] of S.gazeHold) if (p !== best) S.gazeHold.delete(p);
-  if (best && bestAng < TUNING.mutualGazeAngleDeg) {
+  if (gazeOn && best && bestAng < TUNING.mutualGazeAngleDeg) {
     const h = (S.gazeHold.get(best) || 0) + dt;
     S.gazeHold.set(best, h);
     if (h >= TUNING.mutualGazeHold && h - dt < TUNING.mutualGazeHold) {
@@ -784,6 +837,33 @@ function drawMonitor(k) {
   tex.needsUpdate = true;
 }
 
+// ---------- 주관적 불안 점수 (SUDs) ----------
+function drawSudsPanel() {
+  panel.show('지금 불안은 몇 점인가요?', [
+    '0 = 전혀 없음   ·   10 = 견디기 힘들 정도',
+    '',
+    `        ◀   ${S.sudsPost}점   ▶`,
+  ], { footer: S.vr ? '오른손 스틱 좌우로 고르고 트리거로 확정' : '숫자 버튼이나 키(0–9)로 고르기' });
+}
+function setSuds(v, confirm = false) {
+  S.sudsPost = Math.max(0, Math.min(10, v));
+  drawSudsPanel();
+  if (confirm) { S.sudsLog.push({ t: S.t, suds: S.sudsPost, post: true }); log(`공연 후 SUDs ${S.sudsPost}`); setPhase('report'); }
+}
+$('#sudsBox').innerHTML = Array.from({ length: 11 }, (_, i) => `<button type="button" data-v="${i}">${i}</button>`).join('');
+$('#sudsBox').addEventListener('click', (e) => { const v = e.target.dataset && e.target.dataset.v; if (v !== undefined) setSuds(Number(v), true); });
+
+// ---------- 회차 기록 (적응 효과: 보고서 실험 C) ----------
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem('stageon.history') || '[]'); } catch { return []; }
+}
+function saveHistory(entry) {
+  try {
+    const h = loadHistory(); h.push(entry);
+    localStorage.setItem('stageon.history', JSON.stringify(h.slice(-60)));
+  } catch { /* 저장소 사용 불가 */ }
+}
+
 // ---------- 리포트 ----------
 function reportData() {
   return {
@@ -794,12 +874,30 @@ function reportData() {
     peakRatio: S.peakRatio,
     gazeAvoidRatio: S.performTime ? S.gazeAvoid / S.performTime : 0,
     eyeContacts: S.eyeContacts, director: S.director.log, events: S.events, suds: S.sudsLog,
+    sudsPost: S.sudsPost ?? null, cues: S.cues, meanRatio: meanPerformRatio(),
   };
+}
+function meanPerformRatio() {
+  const v = S.hrLog.filter((p) => p.phase === 'perform' && Number.isFinite(p.ratio)).map((p) => p.ratio);
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN;
 }
 function showReport() {
   audio.setHeartbeatVolume(0);
   audio.setCrowdLevel(0.15, 2);
   const data = reportData();
+  const prev = loadHistory().filter((h) => h.scenario === data.scenario);
+  data.session = prev.length + 1;
+  data.prevMeanRatio = prev.length ? prev[prev.length - 1].meanRatio : null;
+  saveHistory({
+    date: new Date().toISOString(), scenario: data.scenario, level: data.level, meanRatio: data.meanRatio,
+    peakRatio: data.peakRatio, mistakes: data.mistakes.length, suds: data.sudsPost,
+    recovery: data.recoveries.length ? data.recoveries.reduce((a, b) => a + b, 0) / data.recoveries.length : null,
+    simulated: S.hr.simulated, cues: S.cues,
+  });
+  const rows = [...prev.slice(-4), { date: new Date().toISOString(), meanRatio: data.meanRatio, mistakes: data.mistakes.length, suds: data.sudsPost, now: true }];
+  const pct = (r) => (Number.isFinite(r) ? `${r >= 0 ? '+' : ''}${Math.round(r * 100)}%` : '–');
+  $('#history').innerHTML = `<b>${data.scenario} 회차별 기록</b><table><tr><th>회차</th><th>날짜</th><th>연주 중 평균 심박</th><th>실수</th><th>SUDs</th></tr>${
+    rows.map((r, i) => `<tr${r.now ? ' class="now"' : ''}><td>${data.session - rows.length + 1 + i}</td><td>${new Date(r.date).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td><td>${pct(r.meanRatio)}</td><td>${r.mistakes}</td><td>${r.suds ?? '–'}</td></tr>`).join('')}</table>`;
   const c = $('#reportCanvas');
   drawReport(c, data);
   panel.showCanvas(c);
@@ -824,10 +922,10 @@ function log(msg) {
   el.prepend(line);
   while (el.childNodes.length > 14) el.removeChild(el.lastChild);
 }
-const PHASE = { menu: '시작 전', backstage: '대기실', call: '호명·입장', hush: '첫 소절 직전', perform: '연주 중', encore: '앵콜 요청', finish: '종료', report: '리포트', stopped: '비상 정지' };
+const PHASE = { menu: '시작 전', backstage: '대기실', call: '호명·입장', hush: '첫 소절 직전', perform: '연주 중', encore: '앵콜 요청', finish: '종료', suds: '불안 점수', report: '리포트', stopped: '비상 정지' };
 function updateHud(ratio) {
   if (!S.level) return;
-  const p = S.director ? S.director.params() : {};
+  const p = S.director ? P() : {};
   const r = Number.isFinite(ratio) ? `${ratio >= 0 ? '+' : ''}${Math.round(ratio * 100)}%` : '–';
   $('#hudText').textContent = `Lv${S.level.id} ${S.level.name} · ${PHASE[S.phase]} · 심박 ${Math.round(S.hr ? S.hr.bpm : 0)} (${r})${S.hr && S.hr.simulated ? ' 시뮬레이션' : ''}`;
   $('#hudSub').textContent = S.phase === 'call' ? '노란 표시까지 걸어 나가세요 (W, 또는 N으로 바로 이동)' : S.phase === 'backstage' ? '대기 중 · Space로 악기 풀기 · N 건너뛰기' : S.phase === 'perform' ? `Space로 박자에 맞춰 연주 · N 건너뛰기 · 연주 ${S.strums}번` : '';

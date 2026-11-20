@@ -1,7 +1,7 @@
 // 헤드셋 안의 안내 패널과 리포트 그래프
 import * as THREE from 'three';
-import { makeCanvasPanel } from './venue.js?v=202611202246';
-import { TUNING } from './config.js?v=202611202246';
+import { makeCanvasPanel } from './venue.js?v=202611202256';
+import { TUNING } from './config.js?v=202611202256';
 
 export class FloatingPanel {
   constructor(scene) {
@@ -112,14 +112,27 @@ export function drawReport(canvas, data) {
   // 오른쪽 수치
   const rx = gx + gw + 60;
   const stat = (label, value, y) => {
-    ctx.fillStyle = '#6C5CE7'; ctx.font = '700 20px "Noto Sans KR", sans-serif'; ctx.fillText(label, rx, y);
-    ctx.fillStyle = '#1E1B3A'; ctx.font = '900 38px "Noto Sans KR", sans-serif'; ctx.fillText(value, rx, y + 44);
+    ctx.fillStyle = '#6C5CE7'; ctx.font = '700 19px "Noto Sans KR", sans-serif'; ctx.fillText(label, rx, y);
+    ctx.fillStyle = '#1E1B3A'; ctx.font = '900 32px "Noto Sans KR", sans-serif'; ctx.fillText(value, rx, y + 38);
   };
   const avgRecovery = data.recoveries.length ? `${(data.recoveries.reduce((a, b) => a + b, 0) / data.recoveries.length).toFixed(1)}초` : '–';
-  stat('최고 심박', `+${Math.round(data.peakRatio * 100)}%`, 150);
-  stat('실수', `${data.mistakes.length}회`, 240);
-  stat('평균 회복 시간', avgRecovery, 330);
-  stat('시선 회피', `${Math.round(data.gazeAvoidRatio * 100)}%`, 420);
-  stat('눈맞춤', `${data.eyeContacts}회`, 510);
-  stat('조절 엔진', `${data.director.length}번 조정`, 600);
+  const pct = (r) => `${r >= 0 ? '+' : ''}${Math.round(r * 100)}%`;
+  let trend = '첫 기록';
+  if (Number.isFinite(data.prevMeanRatio) && Number.isFinite(data.meanRatio)) {
+    const d = Math.round((data.meanRatio - data.prevMeanRatio) * 100);
+    trend = `지난번 대비 ${d > 0 ? '+' : ''}${d}%p`;
+  }
+  const rows = [
+    ['최고 심박', pct(data.peakRatio)],
+    ['실수', `${data.mistakes.length}회`],
+    ['평균 회복 시간', avgRecovery],
+    ['시선 회피', `${Math.round(data.gazeAvoidRatio * 100)}%`],
+    ['눈맞춤', `${data.eyeContacts}회`],
+    ['공연 후 불안 (SUDs)', data.sudsPost === null || data.sudsPost === undefined ? '–' : `${data.sudsPost} / 10`],
+    [`${data.session || 1}회차 · 평균 심박`, Number.isFinite(data.meanRatio) ? pct(data.meanRatio) : '–'],
+    ['적응', trend],
+  ];
+  rows.forEach(([l, v], i) => stat(l, v, 130 + i * 72));
+  const off = Object.entries(data.cues || {}).filter(([, on]) => !on).map(([k]) => ({ gaze: 'E1', eval: 'E2', mistake: 'E3', events: 'E4', body: 'E5' })[k]);
+  if (off.length) { ctx.fillStyle = '#B26F0E'; ctx.font = '700 20px "Noto Sans KR", sans-serif'; ctx.fillText(`실험: ${off.join('·')} 끔`, 40, 112); }
 }

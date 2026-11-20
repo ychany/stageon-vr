@@ -14,6 +14,12 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 await page.goto('http://localhost:8080/index.html?fast=1');
 await page.check(`input[name=scenario][value="${scenario}"]`);
 await page.fill('#name', '테스트');
+// 세 번째 인자로 끌 단서를 줄 수 있다 (예: gaze,body)
+const cuesOff = (process.argv[4] || '').split(',').filter(Boolean);
+if (cuesOff.length) await page.click('details.exp summary');
+for (const cue of cuesOff) {
+  await page.uncheck(`#cue${cue[0].toUpperCase()}${cue.slice(1)}`);
+}
 await page.screenshot({ path: `${out}/0-menu.png` });
 await page.click('#startDesktop');
 await page.waitForTimeout(2500);
@@ -37,12 +43,16 @@ await page.keyboard.press('KeyM');
 await page.waitForTimeout(1000);
 await page.screenshot({ path: `${out}/4-perform.png` });
 
-await page.waitForFunction(() => window.stageon.state.phase === 'report', null, { timeout: 300000 });
+await page.waitForFunction(() => window.stageon.state.phase === 'suds', null, { timeout: 300000 });
+await page.waitForTimeout(500);
+await page.screenshot({ path: `${out}/5-suds.png` });
+await page.keyboard.press('Digit6');
+await page.waitForFunction(() => window.stageon.state.phase === 'report', null, { timeout: 10000 });
 await page.waitForTimeout(800);
-await page.screenshot({ path: `${out}/5-report.png` });
+await page.screenshot({ path: `${out}/6-report.png` });
 const summary = await page.evaluate(() => {
   const s = window.stageon.state;
-  return { scenario: s.sc.title, encore: !!s.encoreDone, events: s.events.map((e) => e.type), phase: s.phase, mistakes: s.mistakes.length, hrSamples: s.hrLog.length, baseline: Math.round(s.baseline), people: s.venue.people.length, director: s.director.log };
+  return { suds: s.sudsPost, cues: s.cues, scenario: s.sc.title, encore: !!s.encoreDone, events: s.events.map((e) => e.type), phase: s.phase, mistakes: s.mistakes.length, hrSamples: s.hrLog.length, baseline: Math.round(s.baseline), people: s.venue.people.length, director: s.director.log };
 });
 console.log(JSON.stringify(summary));
 console.log('errors:', errors.length ? errors : 'none');

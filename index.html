@@ -44,6 +44,17 @@
       </label>
     </fieldset>
 
+    <details class="exp">
+      <summary>실험 설정 · 훈련 보조</summary>
+      <p class="hint">단서를 하나씩 끄고 비교하면 어떤 단서가 불안에 가장 크게 기여하는지 알 수 있습니다 (보고서 실험 B).</p>
+      <label><input id="cueGaze" type="checkbox" checked> E1 시선 (응시·눈맞춤·시선 회피 반응)</label>
+      <label><input id="cueEval" type="checkbox" checked> E2 평가 (촬영·심사위원 메모)</label>
+      <label><input id="cueMistake" type="checkbox" checked> E3 실수 반응 (술렁임·멤버 시선)</label>
+      <label><input id="cueEvents" type="checkbox" checked> E4 예측 불가 사건 (벨소리·모니터 사고·연주 중단)</label>
+      <label><input id="cueBody" type="checkbox" checked> E5 심박 되비추기</label>
+      <label><input id="helper" type="checkbox"> 회복 도우미: 심박이 크게 오르면 호흡 안내 (들숨 4초 · 날숨 6초)</label>
+    </details>
+
     <div class="row buttons">
       <button id="startVR" class="primary" type="button">VR로 시작</button>
       <button id="startDesktop" type="button">PC에서 시작</button>
@@ -64,12 +75,15 @@
 
 <div id="report" hidden>
   <canvas id="reportCanvas" width="1280" height="720"></canvas>
+  <div id="history"></div>
   <div class="row buttons">
     <button id="again" class="primary" type="button">다시 하기</button>
     <button id="download" type="button">데이터 저장 (JSON)</button>
   </div>
 </div>
 
+<div id="sudsBox" hidden></div>
+<div id="breath" hidden>들숨</div>
 <div id="stopped" hidden>
   <p>비상 정지되었습니다.</p>
   <button type="button" onclick="location.reload()">처음으로</button>
@@ -85,6 +99,6 @@
   window.addEventListener('unhandledrejection', function (e) { stageonError(String(e.reason && e.reason.message || e.reason)); });
   setTimeout(function () { if (!document.querySelector('input[name=scenario]')) stageonError('시나리오 목록을 불러오지 못했습니다'); }, 4000);
 </script>
-<script type="module" src="src/main.js?v=202611202246"></script>
+<script type="module" src="src/main.js?v=202611202256"></script>
 </body>
 </html>

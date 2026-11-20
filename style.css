@@ -33,8 +33,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 #debug { margin: 8px 0 0; font: 13px/1.5 ui-monospace, monospace; background: rgba(0,0,0,0.55); padding: 8px 10px; border-radius: 8px; white-space: pre-wrap; max-width: 640px; }
 #log { position: fixed; right: 16px; bottom: 16px; font: 12px/1.5 ui-monospace, monospace; color: #cfcbe6; text-align: right; max-width: 60vw; }
 
-#report { position: fixed; inset: 0; background: rgba(247,246,252,0.97); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; z-index: 6; }
-#reportCanvas { width: auto; height: auto; max-width: min(100%, 1100px); max-height: calc(100vh - 110px); border-radius: 16px; border: 1px solid var(--line); }
+#report { position: fixed; inset: 0; background: rgba(247,246,252,0.97); display: flex; flex-direction: column; align-items: center; justify-content: safe center; padding: 16px; z-index: 6; overflow: auto; }
+#reportCanvas { width: auto; height: auto; max-width: min(100%, 1100px); max-height: calc(100vh - 220px); min-height: 280px; border-radius: 16px; border: 1px solid var(--line); }
 #stopped { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(7,7,11,0.8); color: #fff; font-size: 22px; z-index: 7; }
 #stopped[hidden], #report[hidden], #menu[hidden], #hud[hidden] { display: none; }
 
@@ -50,3 +50,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .error[hidden] { display: none; }
 #skipBtn { position: fixed; right: 16px; top: 16px; z-index: 5; background: rgba(255,255,255,0.9); }
 #skipBtn[hidden] { display: none; }
+details.exp { border: 1px solid var(--line); border-radius: 14px; padding: 10px 16px; background: #fff; margin: 0 0 16px; }
+details.exp summary { font-weight: 700; color: var(--purple); cursor: pointer; }
+details.exp label { display: block; padding: 5px 0; font-size: 15px; }
+#sudsBox { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); display: flex; gap: 6px; z-index: 6; flex-wrap: wrap; justify-content: center; }
+#sudsBox button { width: 48px; padding: 10px 0; font-weight: 700; }
+#sudsBox[hidden] { display: none; }
+#breath { position: fixed; right: 12%; bottom: 18%; width: 110px; height: 110px; border-radius: 50%; border: 4px solid #9fd8ff; color: #9fd8ff; display: flex; align-items: center; justify-content: center; font-weight: 700; z-index: 4; transition: transform 0.1s linear; }
+#breath[hidden] { display: none; }
+#history { margin-top: 10px; font-size: 14px; color: var(--navy); }
+#history table { border-collapse: collapse; margin-top: 4px; }
+#history th, #history td { padding: 3px 12px; border-bottom: 1px solid var(--line); text-align: center; }
+#history tr.now td { font-weight: 700; color: var(--purple); }
