@@ -1,16 +1,16 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611210116';
-import { buildVenue } from './venue.js?v=202611210116';
-import { AudioEngine } from './audio.js?v=202611210116';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611210116';
-import { InstrumentInput } from './mic.js?v=202611210116';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611210116';
-import { estimateTempo } from './tempo.js?v=202611210116';
+import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611210127';
+import { buildVenue } from './venue.js?v=202611210127';
+import { AudioEngine } from './audio.js?v=202611210127';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611210127';
+import { InstrumentInput } from './mic.js?v=202611210127';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611210127';
+import { estimateTempo } from './tempo.js?v=202611210127';
 import qrcode from '../vendor/qrcode.mjs';
-import { FloatingPanel, drawReport } from './ui.js?v=202611210116';
-import { Person, rand } from './figures.js?v=202611210116';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611210116';
+import { FloatingPanel, drawReport } from './ui.js?v=202611210127';
+import { Person, rand } from './figures.js?v=202611210127';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611210127';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -63,7 +63,7 @@ function speak(who, text, sec = 3.5) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = 'rgba(10,10,20,0.72)';
   ctx.fillRect(0, 20, canvas.width, 120);
-  ctx.font = '700 40px "Noto Sans KR", sans-serif'; ctx.fillStyle = '#F2B544';
+  ctx.font = '700 40px "Noto Sans KR", sans-serif'; ctx.fillStyle = '#5EEAD4';
   const label = WHO[who] || who;
   ctx.fillText(label, 30, 96);
   const lw = ctx.measureText(label).width;
@@ -96,9 +96,10 @@ const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), userHead = new THRE
 // ---------- 시작 화면 ----------
 $('#scenarios').innerHTML = SCENARIOS.map((sc, i) => `
   <label class="scenario"><input type="radio" name="scenario" value="${i}" ${i === 2 ? 'checked' : ''}>
-    <span><b>${sc.title}</b> <span class="lv">Lv${sc.level} ${LEVELS[sc.level].name}</span><br>
-    <span class="story">${sc.story.join(' ')}</span></span></label>`).join('');
-$('#behaviors').innerHTML = Object.entries(BEHAVIORS).map(([k, b]) => `<label><input type="checkbox" name="behavior" value="${k}" checked> ${b.label}<span class="why">${b.why}</span></label>`).join('');
+    <span class="lv">Lv${sc.level} · ${LEVELS[sc.level].name} · ${LEVELS[sc.level].desc}</span>
+    <b>${sc.title}</b>
+    <span class="story">${sc.story.join(' ')}</span></label>`).join('');
+$('#behaviors').innerHTML = Object.entries(BEHAVIORS).map(([k, b]) => `<label class="behavior"><input type="checkbox" name="behavior" value="${k}" checked><span><b>${b.label}</b><span class="why">${b.why}</span></span></label>`).join('');
 drawLadder();
 drawQR();
 let photoTexture = null;
@@ -1382,7 +1383,7 @@ function drawInsight(data) {
   const sc = n ? SCENARIOS.findIndex((x) => x.level === n.level) : -1;
   $('#insight').innerHTML = `
     <div class="box"><b>관객 행동 분석</b>${rows.length ? `<ul>${rows.join('')}</ul><span class="hint" style="margin:0">심박이 가장 크게 오른 행동이 지금 나에게 가장 큰 불안 요소입니다.</span>` : '<p class="hint" style="margin:6px 0">이번 공연에서는 기록된 관객 행동이 없습니다.</p>'}</div>
-    <div class="box"><b>다음 회차 추천</b>${n ? `<p style="margin:6px 0;font-size:16px"><b style="color:var(--navy)">${ACT[n.action]}</b> → Lv${n.level} ${LEVELS[n.level].name}${n.helper ? ' · 회복 도우미 켜기' : ''}</p><ul>${n.reasons.map((r) => `<li>${r}</li>`).join('')}</ul>${n.action !== 'real' && sc >= 0 ? `<button type="button" id="goNext" class="primary">추천 단계로 바로 시작</button>` : ''}` : '<p class="hint" style="margin:6px 0">측정 전용 모드에서는 추천하지 않습니다.</p>'}</div>`;
+    <div class="box"><b>다음 회차 추천</b>${n ? `<p style="margin:6px 0;font-size:16px"><b style="color:var(--ink)">${ACT[n.action]}</b> → Lv${n.level} ${LEVELS[n.level].name}${n.helper ? ' · 회복 도우미 켜기' : ''}</p><ul>${n.reasons.map((r) => `<li>${r}</li>`).join('')}</ul>${n.action !== 'real' && sc >= 0 ? `<button type="button" id="goNext" class="primary">추천 단계로 바로 시작</button>` : ''}` : '<p class="hint" style="margin:6px 0">측정 전용 모드에서는 추천하지 않습니다.</p>'}</div>`;
   const go = $('#goNext');
   if (go) go.onclick = () => { try { localStorage.setItem('stageon.autostart', '1'); } catch { /* 무시 */ } restart(); };
 }
@@ -1422,7 +1423,7 @@ function drawLadder() {
     const mine = h.filter((x) => x.level === lv);
     const done = mine.some((x) => x.rec === 'up' || x.rec === 'real');
     const last = mine[mine.length - 1];
-    return `<div class="step${done ? ' done' : ''}${lv === cur ? ' next' : ''}"><b>${done ? '✓ ' : ''}Lv${lv} ${LEVELS[lv].name}</b>${mine.length ? `${mine.length}회 · 최근 SUDs ${last.suds ?? '–'}` : '아직 없음'}${lv === cur ? '<br><span style="color:var(--purple);font-weight:700">다음 추천</span>' : ''}</div>`;
+    return `<div class="step${done ? ' done' : ''}${lv === cur ? ' next' : ''}"><span class="dot">${done ? '✓' : lv}</span><span class="name">${LEVELS[lv].name}</span><span class="stat">${mine.length ? `${mine.length}회 · SUDs ${last.suds ?? '–'}` : '–'}</span>${lv === cur ? '<span class="tag">추천</span>' : ''}</div>`;
   }).join('');
   $('#historyCount').textContent = loadHistory().length ? `${loadHistory().length}회 기록됨` : '';
   $('#historyCsv').onclick = () => download(historyCSV(), `stageon_전체기록_${new Date().toISOString().slice(0, 10)}.csv`);

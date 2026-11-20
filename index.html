@@ -11,106 +11,127 @@
 </head>
 <body>
 <div id="menu">
-  <div class="card">
-    <p class="eyebrow">가상증강현실의 이해 · 텀프로젝트</p>
-    <h1>StageOn</h1>
-    <p class="lead">관객이 만드는 무대 불안을 안전하게 겪고 적응하는 VR 무대</p>
+  <header class="topbar">
+    <div class="brand"><span class="mark" aria-hidden="true"></span>StageOn</div>
+    <div class="meta">가상증강현실의 이해 · 텀프로젝트 프로토타입</div>
+  </header>
 
-    <label class="field">이름 <span class="hint">사회자가 호명할 이름</span>
-      <input id="name" type="text" maxlength="20" placeholder="연주자">
-    </label>
+  <div class="layout">
+    <main class="col-main">
+      <section class="intro">
+        <h1>관객이 만드는 무대 불안을<br>안전하게 겪고 적응하는 VR 무대</h1>
+        <p class="lead">대기실에서 무대까지 실제로 걸어 나가 연주합니다. 관객의 시선과 행동, 예측할 수 없는 사건이 불안을 만들고, 심박에 맞춰 강도가 조절됩니다.</p>
+        <ul class="facts">
+          <li><b>5</b><span>단계 시나리오</span></li>
+          <li><b>6</b><span>가지 관객 행동</span></li>
+          <li><b>+20–40%</b><span>목표 심박 구간</span></li>
+        </ul>
+      </section>
 
-    <fieldset id="ladderBox">
-      <legend>단계별 노출 훈련</legend>
-      <div id="ladder"></div>
-      <p id="nextBanner" class="banner" hidden></p>
-      <div class="row"><button id="historyCsv" type="button">전체 기록 CSV 저장</button><span id="historyCount" class="hint"></span></div>
-    </fieldset>
+      <section class="block">
+        <h2><span class="num">1</span>시나리오</h2>
+        <div id="scenarios" class="scenario-grid"></div>
+        <p id="loadError" class="error" hidden></p>
+      </section>
 
-    <fieldset>
-      <legend>모드</legend>
-      <label><input type="radio" name="mode" value="vr" checked> <b>VR 무대 훈련</b> (실험 조건 B)</label>
-      <label><input type="radio" name="mode" value="baseline"> <b>기준선 측정</b> · 60초 편하게 연주 (실험 전에 한 번)</label>
-      <label><input type="radio" name="mode" value="practice"> <b>측정 전용: 혼자 연습실</b> (실험 조건 A, 헤드셋 없이)</label>
-      <label><input type="radio" name="mode" value="real"> <b>측정 전용: 실제 관객 앞</b> (실험 조건 C, 헤드셋 없이)</label>
-      <label class="field" style="margin:8px 0 0">참가자 번호 <span class="hint">실험할 때만, 저장 파일 이름과 리포트에 들어감</span>
-        <input id="participant" type="text" maxlength="12" placeholder="예: P01">
-      </label>
-      <p class="hint" style="margin:6px 0 0">측정 전용 모드는 같은 반주·같은 곡 길이로 심박을 기록합니다. 실제 심박을 쓰려면 PC Chrome에서 심박 센서를 연결하세요.</p>
-    </fieldset>
+      <section class="block">
+        <h2><span class="num">2</span>관객 행동 <small>불안을 만드는 요소</small></h2>
+        <p class="note">켠 행동이 단계에 맞는 빈도로 공연 중에 일어납니다. 내가 그 장면을 봤는지와 직후 심박 변화를 기록합니다.</p>
+        <div id="behaviors" class="behavior-list"></div>
+        <label class="inline">관객 시선 강도
+          <select id="gazeScale"><option value="low">약하게 (절반만 나를 봄)</option><option value="normal" selected>기본 (단계 설정대로)</option><option value="high">강하게 (모두 눈을 떼지 않고 응시)</option></select>
+        </label>
+      </section>
 
-    <fieldset>
-      <legend>시나리오</legend>
-      <div id="scenarios"></div>
-      <p id="loadError" class="error" hidden></p>
-    </fieldset>
-
-    <fieldset>
-      <legend>관객 행동 (불안을 만드는 요소)</legend>
-      <p class="hint" style="margin:0 0 4px">켠 행동이 단계에 맞는 빈도로 공연 중에 일어납니다. 내가 그 장면을 봤는지도 기록합니다.</p>
-      <div id="behaviors"></div>
-      <label class="field" style="margin:8px 0 0">관객 시선 강도
-        <select id="gazeScale"><option value="low">약하게 (절반만 나를 봄)</option><option value="normal" selected>기본 (단계 설정대로)</option><option value="high">강하게 (모두 눈을 떼지 않고 응시)</option></select>
-      </label>
-    </fieldset>
-
-    <fieldset>
-      <legend>반주</legend>
-      <label><input type="radio" name="track" value="band" checked> 기본 밴드 반주 (100 BPM)</label>
-      <label><input type="radio" name="track" value="file"> 내 곡으로 연주 (MP3·WAV 파일)</label>
-      <div id="trackBox" hidden>
-        <input id="trackFile" type="file" accept="audio/*">
-        <p id="trackStatus" class="hint" style="margin:6px 0"></p>
-        <div class="row" id="trackTempo" hidden>
-          <label style="padding:0">빠르기 <input id="trackBpm" type="number" min="40" max="240" step="0.1" style="width:90px"> BPM</label>
-          <button type="button" id="bpmHalf">÷2</button><button type="button" id="bpmDouble">×2</button>
-          <button type="button" id="trackPreview">박자 들어 보기</button>
+      <section class="block two">
+        <div>
+          <h2><span class="num">3</span>반주</h2>
+          <label class="opt"><input type="radio" name="track" value="band" checked> 기본 밴드 반주 <span class="muted">100 BPM</span></label>
+          <label class="opt"><input type="radio" name="track" value="file"> 내 곡으로 연주 <span class="muted">MP3 · WAV</span></label>
+          <div id="trackBox" hidden>
+            <input id="trackFile" type="file" accept="audio/*">
+            <p id="trackStatus" class="note"></p>
+            <div class="row" id="trackTempo" hidden>
+              <label class="inline" style="margin:0">빠르기 <input id="trackBpm" type="number" min="40" max="240" step="0.1"> BPM</label>
+              <button type="button" class="small" id="bpmHalf">÷2</button><button type="button" class="small" id="bpmDouble">×2</button>
+              <button type="button" class="small" id="trackPreview">박자 들어 보기</button>
+            </div>
+            <label class="opt"><input id="trackFull" type="checkbox"> 곡 끝까지 연주 <span class="muted">끄면 시나리오 길이만큼</span></label>
+          </div>
         </div>
-        <label><input id="trackFull" type="checkbox"> 곡 끝까지 연주 (끄면 시나리오 길이만큼)</label>
+        <div>
+          <h2><span class="num">4</span>악기</h2>
+          <label class="opt"><input type="radio" name="instrument" value="guitar" checked> 일렉 기타</label>
+          <label class="opt"><input type="radio" name="instrument" value="bass"> 베이스</label>
+          <label class="opt"><input id="showInstrument" type="checkbox" checked> 가상 악기 보이기 <span class="muted">VR: 왼손 컨트롤러를 헤드에 장착</span></label>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2><span class="num">5</span>입력 장치</h2>
+        <div class="row"><button id="btConnect" type="button" class="small">심박 센서 연결 (Polar H10)</button><span id="hrStatus" class="muted">연결하지 않으면 시뮬레이션 심박</span></div>
+        <label class="opt"><input id="useMic" type="checkbox"> 악기 소리 입력 <span class="muted">오디오 인터페이스·마이크 — 박자 실수와 정적 감지</span></label>
+        <label class="opt"><input id="reverbMonitor" type="checkbox" checked> 내 악기 소리에 공연장 잔향 입히기</label>
+        <label class="opt"><input id="demoTrigger" type="checkbox" checked> 시연 입력 <span class="muted">오른손 그립 / M 키로 실수 넣기</span></label>
+        <label class="opt">아는 얼굴 사진 <span class="muted">앞줄 관객 한 명의 얼굴로 사용 (본인 동의 필요)</span>
+          <input id="photo" type="file" accept="image/*"><span id="photoName" class="muted"></span>
+        </label>
+      </section>
+
+      <section class="block">
+        <h2><span class="num">6</span>실험 · 측정</h2>
+        <label class="opt"><input type="radio" name="mode" value="vr" checked> <b>VR 무대 훈련</b> <span class="muted">실험 조건 B</span></label>
+        <label class="opt"><input type="radio" name="mode" value="baseline"> <b>기준선 측정</b> <span class="muted">60초 편하게 연주 · 실험 전에 한 번</span></label>
+        <label class="opt"><input type="radio" name="mode" value="practice"> <b>측정 전용: 혼자 연습실</b> <span class="muted">실험 조건 A · 헤드셋 없이</span></label>
+        <label class="opt"><input type="radio" name="mode" value="real"> <b>측정 전용: 실제 관객 앞</b> <span class="muted">실험 조건 C · 헤드셋 없이</span></label>
+        <label class="field">참가자 번호 <span class="muted">실험할 때만 · 저장 파일 이름과 리포트에 들어감</span>
+          <input id="participant" type="text" maxlength="12" placeholder="예: P01">
+        </label>
+        <details class="exp">
+          <summary>단서 끄기 · 회복 도우미</summary>
+          <p class="note">단서를 하나씩 끄고 비교하면 어떤 단서가 불안에 가장 크게 기여하는지 알 수 있습니다 (보고서 실험 B).</p>
+          <label class="opt"><input id="cueGaze" type="checkbox" checked> E1 시선 <span class="muted">응시·눈맞춤·시선 회피 반응</span></label>
+          <label class="opt"><input id="cueEval" type="checkbox" checked> E2 평가 <span class="muted">촬영·팔짱·심사위원 메모</span></label>
+          <label class="opt"><input id="cueMistake" type="checkbox" checked> E3 실수 반응 <span class="muted">술렁임·수군거림·멤버 시선</span></label>
+          <label class="opt"><input id="cueEvents" type="checkbox" checked> E4 예측 불가 사건 <span class="muted">벨소리·모니터 사고·퇴장·연주 중단</span></label>
+          <label class="opt"><input id="cueBody" type="checkbox" checked> E5 심박 되비추기</label>
+          <label class="opt"><input id="helper" type="checkbox"> 회복 도우미 <span class="muted">심박이 크게 오르면 호흡 안내 (들숨 4초 · 날숨 6초)</span></label>
+        </details>
+        <p class="note">측정 전용 모드는 같은 반주·같은 곡 길이로 심박을 기록합니다. 실제 심박을 쓰려면 PC Chrome에서 심박 센서를 연결하세요.</p>
+      </section>
+    </main>
+
+    <aside class="col-side">
+      <div class="panel start">
+        <label class="field">이름 <span class="muted">사회자가 호명할 이름</span>
+          <input id="name" type="text" maxlength="20" placeholder="연주자">
+        </label>
+        <button id="startVR" class="primary wide" type="button">VR로 시작</button>
+        <button id="startDesktop" class="wide" type="button">PC에서 시작</button>
+        <div class="row pair">
+          <button id="startDemo" class="small" type="button">자동 시연 (발표용)</button>
+          <button id="startCheck" class="small" type="button">기기 점검</button>
+        </div>
       </div>
-    </fieldset>
 
-    <fieldset>
-      <legend>악기</legend>
-      <label><input type="radio" name="instrument" value="guitar" checked> 일렉 기타</label>
-      <label><input type="radio" name="instrument" value="bass"> 베이스</label>
-      <label><input id="showInstrument" type="checkbox" checked> 가상 악기 보이기 (VR: 왼손 컨트롤러를 악기 헤드에 장착)</label>
-    </fieldset>
+      <div class="panel" id="ladderBox">
+        <h3>단계별 노출 훈련</h3>
+        <div id="ladder"></div>
+        <p id="nextBanner" class="banner" hidden></p>
+        <div class="row"><button id="historyCsv" type="button" class="small">전체 기록 CSV</button><span id="historyCount" class="muted"></span></div>
+      </div>
 
-    <fieldset>
-      <legend>입력</legend>
-      <div class="row"><button id="btConnect" type="button">심박 센서 연결 (Polar H10)</button><span id="hrStatus" class="hint">연결하지 않으면 시뮬레이션 심박</span></div>
-      <label><input id="useMic" type="checkbox"> 악기 소리 입력 (오디오 인터페이스·마이크) — 박자 실수와 정적 감지</label>
-      <label><input id="reverbMonitor" type="checkbox" checked> 내 악기 소리에 공연장 잔향 입히기</label>
-      <label><input id="demoTrigger" type="checkbox" checked> 시연 모드: 오른손 그립 / M 키로 실수 입력</label>
-      <label class="field">아는 얼굴 사진 <span class="hint">앞줄 관객 한 명의 얼굴로 사용 (본인 동의 필요)</span>
-        <input id="photo" type="file" accept="image/*"><span id="photoName" class="hint"></span>
-      </label>
-    </fieldset>
+      <div class="panel qr">
+        <canvas id="qr" width="160" height="160"></canvas>
+        <div><h3>헤드셋에서 열기</h3><p class="note">Quest 브라우저로 QR을 찍거나 주소를 입력하세요.</p><code id="qrUrl"></code></div>
+      </div>
 
-    <details class="exp">
-      <summary>실험 설정 · 훈련 보조</summary>
-      <p class="hint">단서를 하나씩 끄고 비교하면 어떤 단서가 불안에 가장 크게 기여하는지 알 수 있습니다 (보고서 실험 B).</p>
-      <label><input id="cueGaze" type="checkbox" checked> E1 시선 (응시·눈맞춤·시선 회피 반응)</label>
-      <label><input id="cueEval" type="checkbox" checked> E2 평가 (촬영·심사위원 메모)</label>
-      <label><input id="cueMistake" type="checkbox" checked> E3 실수 반응 (술렁임·멤버 시선)</label>
-      <label><input id="cueEvents" type="checkbox" checked> E4 예측 불가 사건 (벨소리·모니터 사고·연주 중단)</label>
-      <label><input id="cueBody" type="checkbox" checked> E5 심박 되비추기</label>
-      <label><input id="helper" type="checkbox"> 회복 도우미: 심박이 크게 오르면 호흡 안내 (들숨 4초 · 날숨 6초)</label>
-    </details>
-
-    <div class="row buttons">
-      <button id="startVR" class="primary" type="button">VR로 시작</button>
-      <button id="startDesktop" type="button">PC에서 시작</button>
-      <button id="startDemo" type="button">자동 시연 (발표용)</button>
-      <button id="startCheck" type="button">기기 점검</button>
-    </div>
-    <div class="qr row">
-      <canvas id="qr" width="160" height="160"></canvas>
-      <div><b>헤드셋에서 열기</b><br><span class="hint" style="margin:0">Quest 브라우저로 QR을 찍거나 주소를 입력하세요.</span><br><code id="qrUrl"></code></div>
-    </div>
-    <p class="hint">VR: 헤드셋을 쓴 자리가 대기실이고, 정면으로 약 2.2m 걸어 나가면 무대 중앙입니다. 앞쪽 공간을 비워 두세요.<br>
-    PC: 화면 클릭 후 마우스로 보기, W/A/S/D 이동, Space 연주(박자에 맞춰), N 건너뛰기, M 실수, ↑/↓ 심박, 0–9 주관적 불안(SUDs), G 상세 정보, Q 비상 정지.</p>
+      <div class="panel keys">
+        <h3>조작</h3>
+        <p class="note"><b>VR</b> 헤드셋을 쓴 자리가 대기실이고, 정면으로 약 2.2m 걸어 나가면 무대 중앙입니다. 앞쪽 공간을 비워 두세요.</p>
+        <p class="note"><b>PC</b> 화면 클릭 후 마우스로 보기 · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>Space</kbd> 연주 · <kbd>N</kbd> 건너뛰기 · <kbd>M</kbd> 실수 · <kbd>↑</kbd><kbd>↓</kbd> 심박 · <kbd>0–9</kbd> 불안 점수 · <kbd>G</kbd> 상세 · <kbd>Q</kbd> 비상 정지</p>
+      </div>
+    </aside>
   </div>
 </div>
 
@@ -167,6 +188,6 @@
   window.addEventListener('unhandledrejection', function (e) { stageonError(String(e.reason && e.reason.message || e.reason)); });
   setTimeout(function () { if (!document.querySelector('input[name=scenario]')) stageonError('시나리오 목록을 불러오지 못했습니다'); }, 4000);
 </script>
-<script type="module" src="src/main.js?v=202611210116"></script>
+<script type="module" src="src/main.js?v=202611210127"></script>
 </body>
 </html>
