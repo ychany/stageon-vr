@@ -1,5 +1,5 @@
 // 심박 입력: Polar H10 등 표준 Bluetooth 심박 센서, 또는 시뮬레이션 심박.
-import { parseHeartRateMeasurement } from './director.js?v=202611210200';
+import { parseHeartRateMeasurement } from './director.js?v=202611210205';
 
 export class BluetoothHeartRate {
   constructor() {

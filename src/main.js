@@ -1,16 +1,16 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611210200';
-import { buildVenue } from './venue.js?v=202611210200';
-import { AudioEngine } from './audio.js?v=202611210200';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611210200';
-import { InstrumentInput } from './mic.js?v=202611210200';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611210200';
-import { estimateTempo } from './tempo.js?v=202611210200';
+import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611210205';
+import { buildVenue } from './venue.js?v=202611210205';
+import { AudioEngine } from './audio.js?v=202611210205';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611210205';
+import { InstrumentInput } from './mic.js?v=202611210205';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611210205';
+import { estimateTempo } from './tempo.js?v=202611210205';
 import qrcode from '../vendor/qrcode.mjs';
-import { FloatingPanel, drawReport } from './ui.js?v=202611210200';
-import { Person, rand } from './figures.js?v=202611210200';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611210200';
+import { FloatingPanel, drawReport } from './ui.js?v=202611210205';
+import { Person, rand } from './figures.js?v=202611210205';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611210205';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -1429,7 +1429,7 @@ function drawReportPage(data, prev) {
 
 // 심박 곡선 SVG: 기준선 대비 %, 목표 구간, 단계 구분, 실수, 관객 행동
 function chartSVG(data) {
-  const W = 1000, H = 300, L = 48, R = 12, T = 30, B = 34;
+  const W = 1000, H = 310, L = 48, R = 12, T = 44, B = 34;
   const pts = data.hr.filter((p) => ['call', 'hush', 'perform', 'encore', 'finish'].includes(p.phase) && Number.isFinite(p.ratio));
   if (pts.length < 2) return '<p class="empty" style="padding:24px">기록된 심박이 없습니다.</p>';
   const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
@@ -1465,9 +1465,14 @@ function chartSVG(data) {
   g += `<polyline fill="none" stroke="#1F2937" stroke-width="2.5" stroke-linejoin="round" points="${pts.map((p) => `${x(p.t).toFixed(1)},${y(p.ratio).toFixed(1)}`).join(' ')}"/>`;
   // 관객 행동 (위쪽 줄)
   const SHORT = { film: '촬영', stern: '팔짱', whisper: '수군', scroll: '딴짓', leave: '퇴장', cough: '기침' };
-  (data.behaviors || []).forEach((b, i) => {
+  const lastX = [-1e9, -1e9, -1e9];
+  (data.behaviors || []).forEach((b) => {
     if (b.t < t0 || b.t > t1) return;
-    const cy = 9 + (i % 2) * 14;
+    // 가까운 점끼리 겹치지 않게 세 줄 중 빈 줄에 놓는다
+    let row = lastX.findIndex((lx) => x(b.t) - lx > 52);
+    if (row < 0) row = lastX.indexOf(Math.min(...lastX));
+    lastX[row] = x(b.t);
+    const cy = 9 + row * 13;
     g += `<circle cx="${x(b.t)}" cy="${cy}" r="5" fill="${b.seen ? '#0F766E' : '#FFFFFF'}" stroke="#0F766E" stroke-width="1.5"/>`;
     g += `<text x="${x(b.t) + 8}" y="${cy + 4}" font-size="11" fill="#0F766E">${SHORT[b.type] || ''}</text>`;
   });
