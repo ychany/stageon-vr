@@ -64,6 +64,11 @@
           <label class="opt"><input type="radio" name="instrument" value="guitar" checked> 일렉 기타</label>
           <label class="opt"><input type="radio" name="instrument" value="bass"> 베이스</label>
           <label class="opt"><input id="showInstrument" type="checkbox" checked> 가상 악기 보이기 <span class="muted">VR: 왼손 컨트롤러를 헤드에 장착</span></label>
+          <h2 style="margin-top:18px"><span class="num">·</span>공연장 잔향</h2>
+          <label class="opt"><input type="radio" name="ir" value="measured" checked> 실측 잔향 <span class="muted">실제 공간에서 녹음한 임펄스 응답</span></label>
+          <label class="opt"><input type="radio" name="ir" value="synthetic"> 합성 잔향 <span class="muted">공간 크기로 계산 (비교용)</span></label>
+          <label class="opt"><input type="radio" name="ir" value="file"> 내 잔향 파일 <span class="muted">내가 설 공연장에서 녹음한 IR</span></label>
+          <div id="irBox" hidden><input id="irFile" type="file" accept="audio/*"><p id="irStatus" class="note"></p></div>
         </div>
       </section>
 
@@ -209,6 +214,6 @@
   window.addEventListener('unhandledrejection', function (e) { stageonError(String(e.reason && e.reason.message || e.reason)); });
   setTimeout(function () { if (!document.querySelector('input[name=scenario]')) stageonError('시나리오 목록을 불러오지 못했습니다'); }, 4000);
 </script>
-<script type="module" src="src/main.js?v=202611210235"></script>
+<script type="module" src="src/main.js?v=202611240100"></script>
 </body>
 </html>

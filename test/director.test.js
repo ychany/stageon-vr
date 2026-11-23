@@ -154,3 +154,25 @@ test('빠르기 추정: 합성 클릭 트랙의 BPM과 첫 박', () => {
     assert.ok(Math.min(d, beat - d) < 0.03, `offset ${r.offset}`);
   }
 });
+
+// ---------- 추가: 공연장 잔향 ----------
+import { estimateRT60 } from '../src/acoustics.js';
+import { existsSync } from 'node:fs';
+
+test('잔향 시간 추정: 지수 감쇠 잡음의 RT60', () => {
+  const sr = 16000;
+  for (const rt of [0.4, 1.0, 1.8]) {
+    const x = new Float32Array(Math.floor(sr * rt * 1.5));
+    for (let i = 0; i < x.length; i++) x[i] = (Math.random() * 2 - 1) * Math.pow(10, (-60 * (i / sr) / rt) / 20);
+    x[0] = 1.5;
+    const est = estimateRT60(x, sr);
+    assert.ok(Math.abs(est - rt) / rt < 0.15, `${rt} → ${est}`);
+  }
+});
+
+test('단계마다 실측 잔향 파일이 있다', () => {
+  for (const L of Object.values(LEVELS)) {
+    assert.ok(L.venue.ir && L.venue.ir.file, `Lv${L.id}`);
+    assert.ok(existsSync(new URL('../' + L.venue.ir.file, import.meta.url)), L.venue.ir.file);
+  }
+});

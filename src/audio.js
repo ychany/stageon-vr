@@ -1,5 +1,5 @@
 // 공연장 음향: HRTF 입체음향, 공연장 잔향, 관객 소리, 반주 밴드, 심박음.
-// 모든 소리는 Web Audio로 합성한다(외부 음원 파일 없음).
+// 소리는 Web Audio로 합성하고, 공연장 잔향만 실제 공간에서 녹음한 임펄스 응답(assets/ir)을 쓴다.
 
 export class AudioEngine {
   constructor() {
@@ -35,6 +35,19 @@ export class AudioEngine {
     this.noise = makeNoise(ctx, 2);
     this._ambience();
     this.ready = true;
+  }
+
+  // 공연장 잔향 바꾸기: 실측 임펄스 응답(AudioBuffer)으로 컨볼루션
+  setImpulse(buffer) {
+    if (!this.reverb || !buffer) return;
+    this.reverb.buffer = buffer;
+  }
+  async loadImpulse(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`잔향 파일을 불러오지 못했습니다 (${res.status})`);
+    const buf = await this.ctx.decodeAudioData(await res.arrayBuffer());
+    this.setImpulse(buf);
+    return buf;
   }
 
   _bus(gain) {

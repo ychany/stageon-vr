@@ -1,16 +1,17 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611210235';
-import { buildVenue } from './venue.js?v=202611210235';
-import { AudioEngine } from './audio.js?v=202611210235';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611210235';
-import { InstrumentInput } from './mic.js?v=202611210235';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611210235';
-import { estimateTempo } from './tempo.js?v=202611210235';
+import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611240100';
+import { buildVenue } from './venue.js?v=202611240100';
+import { AudioEngine } from './audio.js?v=202611240100';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611240100';
+import { InstrumentInput } from './mic.js?v=202611240100';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611240100';
+import { estimateRT60 } from './acoustics.js?v=202611240100';
+import { estimateTempo } from './tempo.js?v=202611240100';
 import qrcode from '../vendor/qrcode.mjs';
-import { FloatingPanel, drawReport } from './ui.js?v=202611210235';
-import { Person, rand } from './figures.js?v=202611210235';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611210235';
+import { FloatingPanel, drawReport } from './ui.js?v=202611240100';
+import { Person, rand } from './figures.js?v=202611240100';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611240100';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -157,6 +158,47 @@ $('#trackPreview').addEventListener('click', () => {
   }
   setTimeout(() => { if (previewCtx === ctx) { ctx.close(); previewCtx = null; } }, (beat * 8 + 0.5) * 1000);
 });
+// ---------- 공연장 잔향: 실측 임펄스 응답 / 합성 / 내 파일 ----------
+const customIR = { buffer: null, bytes: null, name: '', rt60: NaN };
+document.querySelectorAll('input[name=ir]').forEach((r) => r.addEventListener('change', () => { $('#irBox').hidden = $('input[name=ir]:checked').value !== 'file'; }));
+$('#irFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const bytes = await f.arrayBuffer();
+    const buf = await new OfflineAudioContext(1, 1, 48000).decodeAudioData(bytes.slice(0));
+    if (buf.duration > 10) throw new Error('10초보다 긴 파일은 잔향이 아닌 것 같습니다');
+    const rt = estimateRT60(buf.getChannelData(0), buf.sampleRate);
+    Object.assign(customIR, { buffer: buf, bytes, name: f.name, rt60: rt });
+    $('#irStatus').textContent = `${f.name} · ${buf.duration.toFixed(2)}초 · ${buf.numberOfChannels}채널 · 추정 RT60 ${Number.isFinite(rt) ? rt.toFixed(2) + '초' : '계산 불가'}`;
+  } catch (err) {
+    customIR.buffer = null;
+    $('#irStatus').textContent = `읽을 수 없는 파일입니다 (${err.message || err})`;
+  }
+});
+async function applyIR() {
+  const mode = $('input[name=ir]:checked').value;
+  const L = S.level;
+  const synth = { kind: '합성', name: '공간 크기로 계산', rt60: L.venue.reverbSec };
+  if (mode === 'synthetic') { S.irInfo = synth; return; }
+  if (mode === 'file' && customIR.buffer) {
+    try {
+      // ConvolverNode는 재생 컨텍스트와 같은 샘플레이트의 버퍼만 받으므로 다시 디코딩
+      audio.setImpulse(await audio.ctx.decodeAudioData(customIR.bytes.slice(0)));
+      S.irInfo = { kind: '내 파일', name: customIR.name, rt60: customIR.rt60 };
+      return;
+    } catch (err) { log(`내 잔향 파일을 적용하지 못해 실측 잔향을 씁니다 (${err.message || err})`); }
+  }
+  try {
+    await audio.loadImpulse(L.venue.ir.file);
+    S.irInfo = { kind: '실측', name: L.venue.ir.name, rt60: L.venue.ir.rt60 };
+  } catch (err) {
+    S.irInfo = synth;
+    log(`실측 잔향을 불러오지 못해 합성 잔향을 씁니다 (${err.message || err})`);
+  }
+}
+const irLabel = () => (S.irInfo ? `${S.irInfo.kind} 잔향 · ${S.irInfo.name}${Number.isFinite(S.irInfo.rt60) ? ` · RT60 ${Number(S.irInfo.rt60).toFixed(2)}초` : ''}` : '');
+
 function useTrack() {
   const on = $('input[name=track]:checked').value === 'file' && trackFile.buffer;
   S.track = on ? { buffer: trackFile.buffer, name: trackFile.name, offset: trackFile.offset, full: $('#trackFull').checked } : null;
@@ -208,6 +250,7 @@ async function begin(vr) {
   $('#hud').hidden = false;
 
   await audio.init(level);
+  await applyIR();
   S.hr = btHR || new SimulatedHeartRate(72);
   if ($('#useMic').checked) {
     try {
@@ -274,6 +317,7 @@ function setPhase(ph) {
       S.vr && S.inst ? '왼손 컨트롤러를 헤드에 달고 연주 자세로 든 뒤 오른손 트리거로 위치 맞춤' : '정면 커튼 너머가 무대입니다. 악기를 준비하세요.',
     ], { footer: `Lv${L.id} ${L.name} · ` + (S.vr ? '연주 트리거 · 건너뛰기 B · 비상 정지 X' : '연주 Space · 건너뛰기 N · 실수 M · 비상 정지 Q') });
     S.bsIdx = 0;
+    if (S.irInfo) log(irLabel());
     if (L.timePressure && !S.sc.backstage.some((b) => b.who === 'staff')) setTimeout(() => S.phase === 'backstage' && speak('staff', '5분 전입니다. 준비해 주세요.'), 3000);
   }
   if (ph === 'call') {
@@ -1327,6 +1371,7 @@ function reportData() {
   return {
     level: S.level.id, levelName: S.level.name, scenario: S.sc.title, encore: !!S.encoreDone,
     hrSource: S.hr.simulated ? '시뮬레이션 심박' : S.hr.name,
+    reverb: S.irInfo || null,
     baseline: S.baseline, baselineSource: S.baselineSource, mic: !!S.mic,
     hr: S.hrLog, mistakes: S.mistakes, recoveries: S.tracker.recoveries,
     peakRatio: S.peakRatio,
@@ -1366,7 +1411,7 @@ function showReport() {
   data.next = data.condition === 'vr' ? recommendNext({ level: data.level, meanRatio: data.meanRatio, peakRatio: data.peakRatio, suds: data.sudsPost, prevSuds }, TUNING) : null;
   if (data.next) try { localStorage.setItem('stageon.next', JSON.stringify({ ...data.next, from: data.level, date: new Date().toISOString() })); } catch { /* 무시 */ }
   saveHistory({
-    rec: data.next ? data.next.action : null, behaviors: (data.behaviors || []).length, gazeScale: data.gazeScale,
+    rec: data.next ? data.next.action : null, behaviors: (data.behaviors || []).length, gazeScale: data.gazeScale, reverb: data.reverb ? data.reverb.kind : null,
     date: new Date().toISOString(), scenario: data.scenario, level: data.level, meanRatio: data.meanRatio,
     peakRatio: data.peakRatio, mistakes: data.mistakes.length, suds: data.sudsPost,
     recovery: data.recoveries.length ? data.recoveries.reduce((a, b) => a + b, 0) / data.recoveries.length : null,
@@ -1408,7 +1453,7 @@ function drawReportPage(data, prev) {
   $('#repTitle').textContent = data.scenario;
   const vrMode = data.condition === 'vr';
   $('#repMeta').textContent = [`${data.session}회차`, vrMode ? `Lv${data.level} ${data.levelName}` : '', COND[data.condition] || '', data.participant ? `참가자 ${data.participant}` : '',
-    data.encore ? '앵콜 받음' : '', data.hrSource, data.mic ? '악기 입력' : '실수는 수동 입력', new Date().toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })].filter(Boolean).join(' · ');
+    data.encore ? '앵콜 받음' : '', data.hrSource, data.reverb && vrMode ? `${data.reverb.kind} 잔향` : '', data.mic ? '악기 입력' : '실수는 수동 입력', new Date().toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })].filter(Boolean).join(' · ');
   $('#repSuds').textContent = data.sudsPost === null || data.sudsPost === undefined ? '–' : `${data.sudsPost} / 10`;
   $('#repSudsPrev').textContent = data.prevSuds !== null && data.prevSuds !== undefined ? `지난 회차 ${data.prevSuds}점` : '첫 기록';
 
@@ -1528,7 +1573,7 @@ function historyCSV() {
     { key: 'scenario', label: '시나리오' }, { key: 'level', label: '단계' }, { key: 'meanRatio', label: '연주 중 평균 심박(기준선 대비)' },
     { key: 'peakRatio', label: '최고 심박' }, { key: 'mistakes', label: '실수' }, { key: 'recovery', label: '평균 회복(초)' },
     { key: 'suds', label: '공연 후 SUDs' }, { key: 'behaviors', label: '관객 행동 수' }, { key: 'gazeScale', label: '시선 강도' },
-    { key: 'rec', label: '추천' }, { get: (r) => (r.simulated ? '시뮬레이션' : '센서'), label: '심박 출처' },
+    { key: 'rec', label: '추천' }, { key: 'reverb', label: '잔향' }, { get: (r) => (r.simulated ? '시뮬레이션' : '센서'), label: '심박 출처' },
     { get: (r) => Object.entries(r.cues || {}).filter(([, v]) => !v).map(([k]) => k).join(' '), label: '끈 단서' },
   ]);
 }
@@ -1679,6 +1724,7 @@ async function startCheck() {
   S.vr = vr;
   $('#menu').hidden = true;
   await audio.init(S.level);
+  await applyIR();
   S.hr = btHR || new SimulatedHeartRate(72);
   if ($('#useMic').checked) { try { S.mic = new InstrumentInput(audio); await S.mic.enable({ reverbMonitor: false }); } catch (e) { S.mic = null; CHECK.micError = e.message; } }
   S.venue = buildVenue(scene, S.level);
@@ -1758,6 +1804,7 @@ function checkStep(dt, rawDt) {
     `${session ? ok(Object.keys(ctrl).length) : '·'} 입력 ${session ? (Object.entries(ctrl).map(([k, v]) => `${k === 'left' ? '왼' : '오른'}${v}`).join(' · ') || '없음') : 'PC (키보드·마우스)'}`,
     `   ${handInfo}${Object.keys(CHECK.buttons).length ? ' · 버튼 ' + Object.entries(CHECK.buttons).map(([k, v]) => `${k === 'left' ? 'L' : 'R'}[${v.join(',')}]`).join(' ') : ''}`,
     `${ok(latency < 60)} 소리 ${ac.sampleRate}Hz · 지연 ${latency}ms${CHECK.lastSound ? ` · 방금 ${CHECK.lastSound}에서 박수` : ''}`,
+    `${S.irInfo && S.irInfo.kind === '실측' ? '✓' : '·'} ${irLabel()}`,
     `${S.hr.simulated ? '·' : '✓'} 심박 ${r.heartRate} ${Math.round(S.hr.bpm)} bpm · 악기 입력 ${S.mic ? S.mic.level.toFixed(3) : r.mic}`,
   ];
   const help = S.vr ? '오른손 트리거: 소리 방향 시험 · 왼손 X: 끝내기' : 'Space: 소리 방향 시험 · W/A/S/D·마우스로 둘러보기 · Q: 끝내기';
