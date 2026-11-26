@@ -1,18 +1,18 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611261246';
-import { buildVenue, avatarIdsFor } from './venue.js?v=202611261246';
-import { loadAvatars, RealBody } from './avatars.js?v=202611261246';
-import { AudioEngine } from './audio.js?v=202611261246';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611261246';
-import { InstrumentInput } from './mic.js?v=202611261246';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611261246';
-import { estimateRT60 } from './acoustics.js?v=202611261246';
-import { estimateTempo } from './tempo.js?v=202611261246';
+import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611261614';
+import { buildVenue, avatarIdsFor } from './venue.js?v=202611261614';
+import { loadAvatars, RealBody } from './avatars.js?v=202611261614';
+import { AudioEngine } from './audio.js?v=202611261614';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611261614';
+import { InstrumentInput } from './mic.js?v=202611261614';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611261614';
+import { estimateRT60 } from './acoustics.js?v=202611261614';
+import { estimateTempo } from './tempo.js?v=202611261614';
 import qrcode from '../vendor/qrcode.mjs';
-import { FloatingPanel, drawReport } from './ui.js?v=202611261246';
-import { Person, rand } from './figures.js?v=202611261246';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611261246';
+import { FloatingPanel, drawReport } from './ui.js?v=202611261614';
+import { Person, rand } from './figures.js?v=202611261614';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611261614';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
