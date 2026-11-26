@@ -1,10 +1,10 @@
 // 공연장 구성: 대기실 → (실제로 걷는) 무대 → 객석.
 // 사용자가 헤드셋을 쓴 지점이 대기실이고, 정면으로 STAGE.stageMarkZ 만큼 걸어가면 무대 중앙이다.
 import * as THREE from 'three';
-import { STAGE } from './config.js?v=202611261233';
-import { decorate } from './themes.js?v=202611261233';
-import { Person, Crowd, InstancedPeople, rand, merge } from './figures.js?v=202611261233';
-import { RealBody, pickAvatarIds, FORMAL, avatarsReady } from './avatars.js?v=202611261233';
+import { STAGE } from './config.js?v=202611261246';
+import { decorate } from './themes.js?v=202611261246';
+import { Person, Crowd, InstancedPeople, rand, merge } from './figures.js?v=202611261246';
+import { RealBody, pickAvatarIds, FORMAL, avatarsReady } from './avatars.js?v=202611261246';
 
 const lam = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 
@@ -140,7 +140,7 @@ export function buildVenue(scene, level, opts = {}) {
   box(0.4, 0.15, 0.02, -V.width / 2 + 0.05, -drop + 2.4, audZ1 + 1.5, new THREE.MeshBasicMaterial({ color: 0x20c060 })).rotation.y = Math.PI / 2;
 
   // 앞줄은 실사형 아바타 (불러온 경우에만). 줄마다 시작 위치를 바꿔 같은 얼굴이 붙지 않게 한다
-  const real = opts.avatars !== false && avatarsReady(avatarIdsFor(level));
+  const real = opts.avatars === true && avatarsReady(avatarIdsFor(level));
   // ---------- 심사위원 (오디션) ----------
   let rowZ = STAGE.audienceStartZ;
   if (level.judges) {
@@ -203,10 +203,10 @@ export function buildVenue(scene, level, opts = {}) {
   for (let r = 0; r < level.frontRows; r++) placeRow(level.frontPerRow, 'A');
   for (let r = 0; r < level.midRows; r++) placeRow(level.midPerRow, 'B');
   const mids = out.people.filter((p) => p.tier === 'B');
-  if (mids.length) { out.instB = new InstancedPeople(mids); root.add(out.instB.bodies, out.instB.heads); }
+  if (mids.length) { out.instB = new InstancedPeople(mids, { dim: real }); root.add(out.instB.bodies, out.instB.heads); }
   if (level.crowd > 0) {
     const area = { x0: -V.width / 2 + 1, x1: V.width / 2 - 1, z0: rowZ, z1: Math.max(audZ1 + 1, rowZ - 16), y: -drop };
-    out.crowd = new Crowd(level.crowd, area);
+    out.crowd = new Crowd(level.crowd, area, { dim: real });
     root.add(out.crowd.mesh);
     for (let i = 0; i < 8; i++) out.audiencePositions.push(new THREE.Vector3(rand(area.x0, area.x1), -drop + 1.3, rand(area.z1, area.z0)));
   }

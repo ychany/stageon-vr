@@ -2,7 +2,7 @@
 // (몰입감 Vividness, Presence의 Stable Spatial Place).
 // 움직이지 않는 장식은 merge()로 한 덩어리로 합쳐 그리기 호출 수를 줄인다.
 import * as THREE from 'three';
-import { merge } from './figures.js?v=202611261233';
+import { merge } from './figures.js?v=202611261246';
 
 const R = (a, b) => a + Math.random() * (b - a);
 const M = (x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) =>

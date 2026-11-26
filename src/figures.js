@@ -348,7 +348,7 @@ export class Person {
 
 // 뒷줄 군중: 하나의 InstancedMesh
 export class Crowd {
-  constructor(count, area) {
+  constructor(count, area, { dim = false } = {}) {
     const L = look();
     const geo = merge([
       { geo: G.legs, color: 0x2a2a33, matrix: M(0, 0.4, 0) },
@@ -357,7 +357,7 @@ export class Crowd {
       { geo: G.arm, color: 0x4a4a58, matrix: M(0.27, 1.11, 0) },
       { geo: new THREE.SphereGeometry(0.12, 8, 6), color: 0x8a6a50, matrix: M(0, 1.58, 0) },
     ]);
-    this.mesh = new THREE.InstancedMesh(geo, dimMat, count);
+    this.mesh = new THREE.InstancedMesh(geo, dim ? dimMat : vtxMat, count);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.base = [];
     const c = new THREE.Color();
@@ -400,7 +400,7 @@ export class Crowd {
 // 중간 줄 관객(Tier B): 몸과 머리를 각각 InstancedMesh 하나로 그린다 (그리기 호출 2번).
 // 사람마다의 움직임(고개 돌림, 몸 기울임)은 Person 객체가 계산하고, 그 행렬을 복사해 온다.
 export class InstancedPeople {
-  constructor(people) {
+  constructor(people, { dim = false } = {}) {
     this.people = people;
     const seated = people[0].seated;
     const hip = seated ? 0.45 : 0.8, torsoY = hip + 0.31;
@@ -417,8 +417,8 @@ export class InstancedPeople {
       { geo: G.eye, color: 0x101010, matrix: M(0.045, 0.02, 0.105) },
     ];
     const n = people.length;
-    this.bodies = new THREE.InstancedMesh(merge(bodyParts), dimMat, n);
-    this.heads = new THREE.InstancedMesh(merge(headParts.filter((x) => x.geo !== G.eye)), dimMat, n);
+    this.bodies = new THREE.InstancedMesh(merge(bodyParts), dim ? dimMat : vtxMat, n);
+    this.heads = new THREE.InstancedMesh(merge(dim ? headParts.filter((x) => x.geo !== G.eye) : headParts), dim ? dimMat : vtxMat, n);
     for (const m of [this.bodies, this.heads]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; }
     const c = new THREE.Color();
     people.forEach((p, i) => {
