@@ -12,6 +12,8 @@ export const rand = (a, b) => a + Math.random() * (b - a);
 
 const vtxMat = new THREE.MeshLambertMaterial({ vertexColors: true });
 const darkMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+// 중간 줄·뒷줄은 실제 공연장처럼 조명 밖 어두운 객석: 세부(눈) 없이 어둡게 실루엣으로 보인다
+const dimMat = new THREE.MeshLambertMaterial({ vertexColors: true, color: 0x484848 });
 
 // 여러 도형을 하나의 지오메트리로 합친다 (그리기 호출 수를 줄이기 위해)
 export function merge(parts) {
@@ -189,13 +191,13 @@ export class Person {
       g.rotation.x = -1.0;
       if (this.arms) { this.arms[0].rotation.set(-0.9, 0, 0.35); this.arms[1].rotation.set(-0.9, 0, -0.35); }
     }
-    this.body.add(g);
+    if (!(this.real && this.real.attachPhone(g, mode))) this.body.add(g);
     this.phone = g;
     this.phoneMode = mode;
   }
   removePhone() {
     if (!this.phone) return;
-    this.body.remove(this.phone);
+    if (this.phone.parent) this.phone.parent.remove(this.phone);
     this.phone = null;
     this.phoneMode = null;
     if (this.arms) { this.arms[0].rotation.set(0, 0, 0); this.arms[1].rotation.set(0, 0, 0); }
@@ -220,6 +222,8 @@ export class Person {
         this.reactions.splice(i, 1);
         this.state = r.type; this.stateUntil = now + r.dur;
         if (r.type === 'murmur' && ctx.onMurmur) ctx.onMurmur(this);
+        // 반응은 옆 사람에게 번진다: 수군거리면 옆 사람이 고개를 돌려 듣는다
+        if (r.type === 'murmur' && this.neighbor && !this.neighbor.member && this.neighbor.state === 'idle' && Math.random() < 0.4) this.neighbor.react('whisperBack', 0.3 + Math.random() * 0.4, 1.4);
         if (r.type === 'cheer') this.clap = r.dur;
       }
     }
@@ -276,7 +280,7 @@ export class Person {
     this.body.rotation.x += ((lean ? 0.18 : 0) - this.body.rotation.x) * k;
 
     // 표정
-    if (this.brows) {
+    if (this.brows || this.real) {
       let brow = 0, smile = 0;
       if (now < this.eyeContactUntil) { brow = 0.6; smile = p.friendly ? 0.7 : 0; }
       if (this.state === 'murmur') { brow = -1; smile = -0.3; }
@@ -287,10 +291,12 @@ export class Person {
       if (p.friendly && !this.stern && this.state === 'idle' && now >= this.eyeContactUntil) smile = 0.35;
       this.exprNow.brow += (brow - this.exprNow.brow) * Math.min(1, dt * 8);
       this.exprNow.smile += (smile - this.exprNow.smile) * Math.min(1, dt * 8);
-      this.brows.position.y = this.exprNow.brow * 0.012;
-      this.brows.scale.y = 1;
-      this.mouth.scale.set(1 + this.exprNow.smile * 0.5, 1 + Math.max(0, this.exprNow.smile) * 0.6, 1);
-      this.mouth.position.y = -0.055 + this.exprNow.smile * 0.004;
+      if (this.brows) {
+        this.brows.position.y = this.exprNow.brow * 0.012;
+        this.brows.scale.y = 1;
+        this.mouth.scale.set(1 + this.exprNow.smile * 0.5, 1 + Math.max(0, this.exprNow.smile) * 0.6, 1);
+        this.mouth.position.y = -0.055 + this.exprNow.smile * 0.004;
+      }
     }
 
     // 가만히 있을 때도 사람처럼: 숨쉬기와 체중 이동
@@ -332,6 +338,7 @@ export class Person {
       if (this.arms && this.phoneMode === 'film') { this.arms[0].rotation.set(0, 0, 0.04); this.arms[1].rotation.set(-1.25, 0, 0); }
       if (this.arms && this.phoneMode === 'scroll') { this.arms[0].rotation.set(-0.9, 0, 0.35); this.arms[1].rotation.set(-0.9, 0, -0.35); }
     }
+    if (this.real) this.real.update(dt, now, ctx);
   }
 
   headWorld(out) {
@@ -350,7 +357,7 @@ export class Crowd {
       { geo: G.arm, color: 0x4a4a58, matrix: M(0.27, 1.11, 0) },
       { geo: new THREE.SphereGeometry(0.12, 8, 6), color: 0x8a6a50, matrix: M(0, 1.58, 0) },
     ]);
-    this.mesh = new THREE.InstancedMesh(geo, vtxMat, count);
+    this.mesh = new THREE.InstancedMesh(geo, dimMat, count);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.base = [];
     const c = new THREE.Color();
@@ -410,8 +417,8 @@ export class InstancedPeople {
       { geo: G.eye, color: 0x101010, matrix: M(0.045, 0.02, 0.105) },
     ];
     const n = people.length;
-    this.bodies = new THREE.InstancedMesh(merge(bodyParts), vtxMat, n);
-    this.heads = new THREE.InstancedMesh(merge(headParts), vtxMat, n);
+    this.bodies = new THREE.InstancedMesh(merge(bodyParts), dimMat, n);
+    this.heads = new THREE.InstancedMesh(merge(headParts.filter((x) => x.geo !== G.eye)), dimMat, n);
     for (const m of [this.bodies, this.heads]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; }
     const c = new THREE.Color();
     people.forEach((p, i) => {

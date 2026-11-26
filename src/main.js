@@ -1,17 +1,18 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611240100';
-import { buildVenue } from './venue.js?v=202611240100';
-import { AudioEngine } from './audio.js?v=202611240100';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611240100';
-import { InstrumentInput } from './mic.js?v=202611240100';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611240100';
-import { estimateRT60 } from './acoustics.js?v=202611240100';
-import { estimateTempo } from './tempo.js?v=202611240100';
+import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611261218';
+import { buildVenue, avatarIdsFor } from './venue.js?v=202611261218';
+import { loadAvatars, RealBody } from './avatars.js?v=202611261218';
+import { AudioEngine } from './audio.js?v=202611261218';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611261218';
+import { InstrumentInput } from './mic.js?v=202611261218';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611261218';
+import { estimateRT60 } from './acoustics.js?v=202611261218';
+import { estimateTempo } from './tempo.js?v=202611261218';
 import qrcode from '../vendor/qrcode.mjs';
-import { FloatingPanel, drawReport } from './ui.js?v=202611240100';
-import { Person, rand } from './figures.js?v=202611240100';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611240100';
+import { FloatingPanel, drawReport } from './ui.js?v=202611261218';
+import { Person, rand } from './figures.js?v=202611261218';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611261218';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -231,6 +232,19 @@ $('#startDemo').addEventListener('click', startDemo);
 $('#startCheck').addEventListener('click', startCheck);
 $('#startVR').addEventListener('click', () => begin(true));
 
+
+// 실사형 관객 불러오기 (?simple=1 이면 기존 도형 관객)
+const SIMPLE = new URLSearchParams(location.search).has('simple');
+async function prepareAvatars(level) {
+  if (SIMPLE) return;
+  const t0 = performance.now();
+  log('관객 아바타 불러오는 중…');
+  try {
+    await loadAvatars(avatarIdsFor(level));
+    log(`관객 아바타 준비 (${((performance.now() - t0) / 1000).toFixed(1)}초)`);
+  } catch (e) { log(`실사 관객을 불러오지 못해 단순 모델로 진행합니다 (${e.message || e})`); }
+}
+
 async function begin(vr) {
   S.participant = $('#participant').value.trim();
   S.mode = $('input[name=mode]:checked').value;
@@ -260,7 +274,9 @@ async function begin(vr) {
     } catch (e) { S.mic = null; log(`악기 입력 실패: ${e.message}`); }
   }
 
+  await prepareAvatars(level);
   S.venue = buildVenue(scene, level);
+  initEngagement(level);
   if (photoTexture) applyPhoto(photoTexture);
   // 악기: 무대 뒤 앰프에서 내 소리가 나온다
   const instType = $('input[name=instrument]:checked').value;
@@ -299,7 +315,18 @@ function applyPhoto(tex) {
   const p = front[0];
   const face = new THREE.Mesh(new THREE.CircleGeometry(0.105, 24), new THREE.MeshLambertMaterial({ map: tex }));
   face.position.set(0, 0, 0.118);
-  p.neck.add(face);
+  if (p.real) {
+    // 실사 아바타는 머리 뼈에 붙인다 (얼굴 앞 12cm, 정면을 향하게)
+    const head = p.real.bones.Bip01_Head;
+    p.root.updateMatrixWorld(true);
+    const wp = head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.02, 0.105).applyQuaternion(p.root.getWorldQuaternion(new THREE.Quaternion())));
+    const wq = p.root.getWorldQuaternion(new THREE.Quaternion());
+    head.add(face);
+    const inv = head.matrixWorld.clone().invert();
+    face.position.copy(wp.applyMatrix4(inv));
+    face.quaternion.copy(head.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(wq));
+    face.scale.setScalar(100 * 0.9);
+  } else p.neck.add(face);
   p.watcher = true;
   p.knownFace = true;
 }
@@ -529,6 +556,15 @@ function onMistake(source) {
   spikeHR(0.12);
   const p = P();
   S.murmurBudget = 5;
+  // 관심도·호감: 실수하면 앞줄부터 식고(반응이 뒤로 번짐), 잘 넘기면 다시 오른다
+  // 같은 구간의 연속 실수는 한 번으로 친다 (3초 안의 실수는 관심도를 다시 깎지 않음)
+  const hit = !S.lastEngageHit || now - S.lastEngageHit > 3;
+  if (hit) S.lastEngageHit = now;
+  for (const person of S.venue.people) {
+    if (!hit || person.member || person.judge || person.engage === undefined) continue;
+    const d = 0.06 + Math.random() * 0.05;
+    S.pending.push({ at: now + reactionDelay(person.row, Math.random(), TUNING), fn: () => { person.engage = Math.max(0, person.engage - d); } });
+  }
   for (const person of S.venue.people) {
     if (person.member || person.judge) continue;
     if (Math.random() < p.reaction) person.react('murmur', reactionDelay(person.row, Math.random(), TUNING), 1.6);
@@ -612,6 +648,7 @@ function audienceBehavior(type, why = '') {
     if (p.seated) {
       // 앉아 있던 사람은 같은 모습의 선 사람으로 바꿔 일어나게 한다
       const w = new Person({ tier: 'A', row: p.row, look: p.look });
+      if (p.real) new RealBody(w, p.real.id);
       w.root.position.copy(from);
       S.venue.root.add(w.root);
       S.venue.people.push(w);
@@ -629,6 +666,7 @@ function audienceBehavior(type, why = '') {
     if (!q) return;
     p = q;
     audio.cough(p.headWorld(tmp).clone());
+    if (p.real) p.real.gesture(p.seated ? 'sit_chair_idle_cough' : 'idle_cough_01', 2.6);
   }
   const seen = seenByUser(p.headWorld(new THREE.Vector3()));
   S.behaviorLog.push({ t: now, type, seen, why });
@@ -644,9 +682,37 @@ function onMurmur(person) {
   }
 }
 
+// 관객 한 명 한 명의 관심도 (0~1). 무대 분위기를 기본값으로, 사람마다 성격 차이를 둔다
+function initEngagement(level) {
+  const base = { friendly: 0.7, neutral: 0.55, indifferent: 0.35, cold: 0.45 }[level.mood] ?? 0.55;
+  for (const p of S.venue.people) {
+    if (p.member || p.judge) continue;
+    p.trait = Math.random();                       // 0: 무심한 편 ~ 1: 열성적인 편
+    p.engage = THREE.MathUtils.clamp(base + (p.trait - 0.5) * 0.4, 0.05, 0.95);
+    p.cheerStyle = level.id >= 3 && p.trait > 0.6; // 서 있는 공연장의 열성 관객은 박수 대신 환호
+  }
+  S.engageClock = 0;
+  S.lastEngageHit = 0;
+}
+// 매 프레임: 실수 없이 이어 가면 관심이 오르고, 평소에는 각자 기본값으로 천천히 돌아간다.
+// 관심도는 박자 끄덕임·앞으로 기울기·딴짓(하품·두리번) 빈도로 보인다.
+function updateEngagement(dt) {
+  if (!S.venue) return;
+  const playing = ['perform', 'encore'].includes(S.phase);
+  const clean = playing && (!S.mistakes.length || S.t - S.mistakes[S.mistakes.length - 1] > 4);
+  const base = { friendly: 0.7, neutral: 0.55, indifferent: 0.35, cold: 0.45 }[S.level.mood] ?? 0.55;
+  for (const p of S.venue.people) {
+    if (p.engage === undefined) continue;
+    const home = THREE.MathUtils.clamp(base + (p.trait - 0.5) * 0.4, 0.05, 0.95);
+    p.engage += (home - p.engage) * dt * 0.03;
+    if (clean) p.engage = Math.min(1, p.engage + dt * 0.012 * (0.5 + p.trait));
+    if (p.real) p.real.nodAmp = playing ? THREE.MathUtils.clamp((p.engage - 0.5) * 2.2, 0, 1) : 0;
+  }
+}
+
 function onRecovered(dur) {
   log(`회복 (${dur.toFixed(1)}초)`);
-  S.venue.people.forEach((p) => { if (!p.member && !p.judge) { p.watcher = Math.random() < P().gazeRatio + 0.1; if (Math.random() < 0.3) p.react('cheer', rand(0.3, 1.2), 1.5); } });
+  S.venue.people.forEach((p) => { if (!p.member && !p.judge) { p.watcher = Math.random() < P().gazeRatio + 0.1; if (p.engage !== undefined) p.engage = Math.min(1, p.engage + 0.1); if (Math.random() < 0.3) p.react('cheer', rand(0.3, 1.2), 1.5); } });
   audio.applause(S.venue.audiencePositions.slice(0, 6), 0.4, 1.8);
 }
 
@@ -665,7 +731,11 @@ function randomEvent(forced) {
     if (p.neighbor) { p.neighbor.lookAt = p.headWorld(new THREE.Vector3()); p.neighbor.lookAtUntil = S.t + 2.5; }
   }
   if (type === 'monitorDrop') audio.monitorDrop(8);
-  if (type === 'cough' && aud.length) audio.cough(aud[Math.floor(Math.random() * aud.length)].headWorld(tmp).clone());
+  if (type === 'cough' && aud.length) {
+    const c = aud[Math.floor(Math.random() * aud.length)];
+    audio.cough(c.headWorld(tmp).clone());
+    if (c.real) c.real.gesture(c.seated ? 'sit_chair_idle_cough' : 'idle_cough_01', 2.6);
+  }
   if (type === 'flicker') {
     const s = S.venue.spot, base = s.intensity;
     // 깜빡임은 초당 3회를 넘지 않게
@@ -674,6 +744,8 @@ function randomEvent(forced) {
   }
   if (type === 'lateComer') {
     const p = new Person({ tier: 'A', row: 9 });
+    const reals = S.venue.front.filter((x) => x.real);
+    if (reals.length) new RealBody(p, reals[Math.floor(Math.random() * reals.length)].real.id);
     const from = S.venue.doorPos.clone();
     const to = from.clone().add(new THREE.Vector3(2.5, 0, -1));
     p.root.position.copy(from);
@@ -1098,7 +1170,10 @@ function step(dt, cam) {
   for (let i = S.pending.length - 1; i >= 0; i--) if (now >= S.pending[i].at) { S.pending[i].fn(); S.pending.splice(i, 1); }
 
   // 인물 업데이트
-  const ctx = { userHead, idleTarget: S.venue.idleTarget, params: P(), tmp, tmp2, onMurmur };
+  updateEngagement(dt);
+  const ct = audio.ctx ? audio.ctx.currentTime : 0;
+  const beatPhase = (['perform', 'encore'].includes(S.phase) && audio.gridStart && ct > audio.gridStart) ? ((ct - audio.gridStart) / audio.beatSec) % 1 : undefined;
+  const ctx = { userHead, idleTarget: S.venue.idleTarget, params: P(), tmp, tmp2, onMurmur, beatPhase };
   for (const p of S.venue.people) {
     if (p.walk) {
       const k = THREE.MathUtils.clamp((now - p.walk.start) / p.walk.dur, 0, 1);
@@ -1170,6 +1245,7 @@ function gazeTracking(dt, cam, now) {
     if (h >= TUNING.mutualGazeHold && h - dt < TUNING.mutualGazeHold) {
       S.eyeContacts++;
       S.pending.push({ at: now + rand(0.15, TUNING.mutualGazeReact), fn: () => best.eyeContact(S.t) });
+      if (best.engage !== undefined) best.engage = Math.min(1, best.engage + 0.08);
       spikeHR(0.03);
     }
   }
@@ -1727,7 +1803,9 @@ async function startCheck() {
   await applyIR();
   S.hr = btHR || new SimulatedHeartRate(72);
   if ($('#useMic').checked) { try { S.mic = new InstrumentInput(audio); await S.mic.enable({ reverbMonitor: false }); } catch (e) { S.mic = null; CHECK.micError = e.message; } }
+  await prepareAvatars(S.level);
   S.venue = buildVenue(scene, S.level);
+  initEngagement(S.level);
   S.director = new StressorDirector(S.level, TUNING);
   S.venue.spot.intensity = 260; S.venue.wash.intensity = 3; S.venue.hemi.intensity = S.level.venue.houseLight;
   camera.position.set(0, 1.6, STAGE.stageMarkZ);
