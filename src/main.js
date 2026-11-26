@@ -1,18 +1,18 @@
 // StageOn 프로토타입: 공연 타임라인(대기실 → 호명 → 정적 → 연주 → 종료 → 리포트)과 불안 장치 연결
 import * as THREE from 'three';
-import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611261218';
-import { buildVenue, avatarIdsFor } from './venue.js?v=202611261218';
-import { loadAvatars, RealBody } from './avatars.js?v=202611261218';
-import { AudioEngine } from './audio.js?v=202611261218';
-import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611261218';
-import { InstrumentInput } from './mic.js?v=202611261218';
-import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611261218';
-import { estimateRT60 } from './acoustics.js?v=202611261218';
-import { estimateTempo } from './tempo.js?v=202611261218';
+import { LEVELS, TUNING, STAGE, SCENARIOS, BEHAVIORS, GAZE_SCALE } from './config.js?v=202611261233';
+import { buildVenue, avatarIdsFor } from './venue.js?v=202611261233';
+import { loadAvatars, RealBody } from './avatars.js?v=202611261233';
+import { AudioEngine } from './audio.js?v=202611261233';
+import { BluetoothHeartRate, SimulatedHeartRate } from './heart.js?v=202611261233';
+import { InstrumentInput } from './mic.js?v=202611261233';
+import { MovingAverage, StressorDirector, RecoveryTracker, TimingJudge, reactionDelay, pickBehavior, behaviorGap, recommendNext, toCSV } from './director.js?v=202611261233';
+import { estimateRT60 } from './acoustics.js?v=202611261233';
+import { estimateTempo } from './tempo.js?v=202611261233';
 import qrcode from '../vendor/qrcode.mjs';
-import { FloatingPanel, drawReport } from './ui.js?v=202611261218';
-import { Person, rand } from './figures.js?v=202611261218';
-import { Instrument, InstrumentSound } from './instrument.js?v=202611261218';
+import { FloatingPanel, drawReport } from './ui.js?v=202611261233';
+import { Person, rand } from './figures.js?v=202611261233';
+import { Instrument, InstrumentSound } from './instrument.js?v=202611261233';
 
 const $ = (s) => document.querySelector(s);
 // ?fast=1 : 시연·테스트용으로 대기실과 곡 길이를 줄인다
@@ -1285,6 +1285,9 @@ function startReplay() {
   if (!ghost) {
     ghost = new Person({ tier: 'A' });
     ghost.root.scale.set(1, 1, 1);
+    // 과거의 나: 실사 관객 사이에서 구분되도록 반투명 청록 실루엣으로 그린다
+    const ghostMat = new THREE.MeshLambertMaterial({ color: 0x5eead4, emissive: 0x0f766e, emissiveIntensity: 0.6, transparent: true, opacity: 0.55, depthWrite: false });
+    ghost.root.traverse((o) => { if (o.isMesh) o.material = ghostMat; });
     if (S.inst) { const g = S.inst.model.clone(true); g.scale.setScalar(0.9); g.position.set(-0.45, 1.05, 0.25); g.rotation.set(0, 0, -0.5); ghost.body.add(g); }
     scene.add(ghost.root);
   }

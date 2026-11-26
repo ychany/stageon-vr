@@ -230,14 +230,21 @@ export class RealBody {
     const crossT = p.crossed && !p.phone && !p.clap && p.state !== 'whisper' && !p.judge ? 1 : 0;
     this.armCross += (crossT - this.armCross) * Math.min(1, dt * 3);
     if (this.armCross > 0.01) {
-      p.root.getWorldQuaternion(_q);
-      const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(_q), right = new THREE.Vector3(-1, 0, 0).applyQuaternion(_q), down = new THREE.Vector3(0, -1, 0);
-      for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
-        const inward = right.clone().multiplyScalar(s);   // L팔은 오른쪽(몸 안쪽)으로
-        const up = B[`Bip01_${side}_UpperArm`], fo = B[`Bip01_${side}_Forearm`], ha = B[`Bip01_${side}_Hand`];
-        if (!up || !fo || !ha) continue;
-        aimBone(up, fo, down.clone().multiplyScalar(0.6).addScaledVector(fwd, 0.5).addScaledVector(inward, -0.12), this.armCross);
-        aimBone(fo, ha, inward.clone().multiplyScalar(0.95).addScaledVector(fwd, 0.12).addScaledVector(UPV, side === 'L' ? 0.32 : 0.2), this.armCross);
+      // 가슴 기준 좌표: 위(골반→목), 오른쪽(왼팔→오른팔), 앞(몸 정면). 앉아서 기대도 가슴 앞에서 팔짱을 낀다
+      const L0 = B.Bip01_L_UpperArm, R0 = B.Bip01_R_UpperArm;
+      if (L0 && R0 && B.Bip01_Neck && B.Bip01_Spine1) {
+        const up = B.Bip01_Neck.getWorldPosition(new THREE.Vector3()).sub(B.Bip01_Spine1.getWorldPosition(new THREE.Vector3())).normalize();
+        const rightV = R0.getWorldPosition(new THREE.Vector3()).sub(L0.getWorldPosition(new THREE.Vector3())).normalize();
+        const fwd = new THREE.Vector3().crossVectors(rightV, up).normalize();
+        p.root.getWorldQuaternion(_q);
+        if (fwd.dot(new THREE.Vector3(0, 0, 1).applyQuaternion(_q)) < 0) fwd.negate();
+        for (const side of ['L', 'R']) {
+          const inward = rightV.clone().multiplyScalar(side === 'L' ? 1 : -1);
+          const ua = B[`Bip01_${side}_UpperArm`], fo = B[`Bip01_${side}_Forearm`], ha = B[`Bip01_${side}_Hand`];
+          if (!ua || !fo || !ha) continue;
+          aimBone(ua, fo, up.clone().multiplyScalar(-0.72).addScaledVector(fwd, 0.6).addScaledVector(inward, -0.1), this.armCross);
+          aimBone(fo, ha, inward.clone().multiplyScalar(0.95).addScaledVector(fwd, 0.18).addScaledVector(up, side === 'L' ? 0.32 : 0.18), this.armCross);
+        }
       }
     }
     // 시선: Person이 계산한 yaw/pitch/roll(몸 기준)로 목·머리를 돌린다. 박자에 맞춰 끄덕임을 더한다
